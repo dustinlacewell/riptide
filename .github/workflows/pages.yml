@@ -35,8 +35,10 @@ jobs:
             package-lock.json
             site/package-lock.json
       # The site imports the app (../src), which resolves packages from the
-      # repo root, so both installs are needed.
-      - run: npm ci
+      # repo root, so both installs are needed. The root lock is written on
+      # Windows, where npm leaves out rolldown's Linux-only wasm packages
+      # (@emnapi/*); `npm ci` then calls it out of sync, so install instead.
+      - run: npm install --no-audit --no-fund
       - run: npm ci
         working-directory: site
       - run: npm run build
