@@ -7,7 +7,8 @@
  * or grown. A rescan is cheap and always truthful.
  */
 
-const KEY = "riptide.prefs.v1";
+/** The store key all preferences live under, as one JSON blob. */
+export const KEY = "riptide.prefs.v1";
 
 /** Tabs a stored preference may name. An unknown one falls back to default. */
 const TABS = ["zap", "search", "caches"];
