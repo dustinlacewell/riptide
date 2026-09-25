@@ -1,0 +1,95 @@
+/* Design tokens. Dark first; light and reduced motion override below.
+   Nothing outside this file names a raw color, size, radius or duration. */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0b1117;
+  --panel: #111a22;
+  --raised: #172330;
+  --line: #22313f;
+  --text: #e6eef3;
+  --dim: #7f93a3;
+  --scrim: rgba(5, 9, 13, 0.8);
+
+  /* Meaning */
+  --current: #3dd6f5;
+  --current-wash: rgba(61, 214, 245, 0.12);
+  --safe: #4ade80;
+  --safe-wash: rgba(74, 222, 128, 0.12);
+  --caution: #f5b83d;
+  --caution-wash: rgba(245, 184, 61, 0.12);
+  --refused: #f0506e;
+  --refused-wash: rgba(240, 80, 110, 0.12);
+  --refused-tint: rgba(240, 80, 110, 0.06);
+  --on-accent: #0b1117;
+
+  --done: var(--safe);
+  --done-wash: var(--safe-wash);
+  --failed: var(--refused);
+  --failed-wash: var(--refused-wash);
+  --danger: var(--refused);
+  --danger-wash: var(--refused-wash);
+
+  /* Type: five sizes, two faces */
+  --font-ui: "Space Grotesk Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, Consolas, monospace;
+  --fs-caps: 11px;
+  --fs-body: 13px;
+  --fs-title: 16px;
+  --fs-stat: 28px;
+  --fs-hero: 56px;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-pill: 999px;
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 40px;
+
+  /* Motion */
+  --t-quick: 120ms;
+  --t-base: 220ms;
+  --t-surge: 600ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-surge: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f4f7f9;
+    --panel: #ffffff;
+    --raised: #eaf0f4;
+    --line: #d5dee5;
+    --text: #0d1b24;
+    --dim: #587080;
+    --scrim: rgba(13, 27, 36, 0.45);
+    --current: #0891b2;
+    --current-wash: rgba(8, 145, 178, 0.12);
+    --safe: #15803d;
+    --safe-wash: rgba(21, 128, 61, 0.12);
+    --caution: #b45309;
+    --caution-wash: rgba(180, 83, 9, 0.12);
+    --refused: #be123c;
+    --refused-wash: rgba(190, 18, 60, 0.12);
+    --refused-tint: rgba(190, 18, 60, 0.06);
+    --on-accent: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-quick: 0ms;
+    --t-base: 0ms;
+    --t-surge: 0ms;
+  }
+}

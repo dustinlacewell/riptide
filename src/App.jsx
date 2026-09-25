@@ -5,6 +5,7 @@ import SearchPanel from "./SearchPanel.jsx";
 import CachePanel from "./CachePanel.jsx";
 import { COLUMNS, DEFAULT_SORT } from "./sort.js";
 import { load, remember, save } from "./persist.js";
+import WaveMark from "./ui/WaveMark.jsx";
 
 const TABS = {
   zap: { label: "Zap", tagline: "Find build junk. Keep what you need. Zap the rest." },
@@ -72,29 +73,35 @@ export default function App() {
   const shared = { root, setRoot, chooseRoot, recentRoots, roots, prefs, onPrefsChange };
 
   return (
-    <div className="app">
-      <header>
-        <h1>riptide</h1>
-        <p className="tagline">{TABS[tab].tagline}</p>
+    <>
+      <header className="app-header">
+        <div className="wordmark">
+          <WaveMark />
+          <span>riptide</span>
+        </div>
+
+        <nav className="tabs" aria-label="Tools">
+          {Object.entries(TABS).map(([key, { label, tagline }]) => (
+            <button
+              key={key}
+              className={`tab${tab === key ? " active" : ""}`}
+              aria-current={tab === key ? "page" : undefined}
+              title={tagline}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <nav className="tabs">
-        {Object.entries(TABS).map(([key, { label }]) => (
-          <button
-            key={key}
-            className={`tab${tab === key ? " active" : ""}`}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <main className="app">
+        {error && <p className="error">{error}</p>}
 
-      {error && <p className="error">{error}</p>}
-
-      {tab === "zap" && <ZapPanel {...shared} />}
-      {tab === "search" && <SearchPanel {...shared} />}
-      {tab === "caches" && <CachePanel {...shared} />}
-    </div>
+        {tab === "zap" && <ZapPanel {...shared} />}
+        {tab === "search" && <SearchPanel {...shared} />}
+        {tab === "caches" && <CachePanel {...shared} />}
+      </main>
+    </>
   );
 }

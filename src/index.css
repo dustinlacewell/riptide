@@ -1,16 +1,3 @@
-:root {
-  color-scheme: dark;
-  --bg: #16181d;
-  --panel: #1e2128;
-  --line: #2e323c;
-  --text: #e4e7ec;
-  --dim: #8b93a3;
-  --accent: #4c9aff;
-  --danger: #e5484d;
-  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  font-size: 14px;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -19,56 +6,90 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
 }
 
-.app {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 32px 24px 64px;
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
 }
 
-header h1 {
-  margin: 0;
-  font-size: 24px;
-  letter-spacing: -0.02em;
+:focus-visible {
+  outline: 2px solid var(--current);
+  outline-offset: 2px;
 }
 
-.tagline {
-  margin: 4px 0 24px;
-  color: var(--dim);
+/* --- shell --------------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: 64px;
+  padding: 0 var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--current);
+}
+
+.wordmark span {
+  color: var(--text);
+  font-size: var(--fs-title);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .tabs {
   display: flex;
-  gap: 2px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--line);
+  gap: var(--s-1);
+  height: 64px;
 }
 
 button.tab {
-  padding: 8px 18px;
+  height: 64px;
+  padding: 0 var(--s-4);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   border-radius: 0;
   color: var(--dim);
-  font-size: 14px;
+  font-size: var(--fs-title);
+  font-weight: 600;
   cursor: pointer;
+  transition: color var(--t-quick) var(--ease-out);
 }
 
-button.tab:hover {
+button.tab:hover:not(:disabled) {
   color: var(--text);
 }
 
 button.tab.active {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--text);
 }
+
+.app {
+  padding: var(--s-5);
+}
+
+.app > * + * {
+  margin-top: var(--s-4);
+}
+
+/* --- controls ------------------------------------------------------------ */
 
 .options {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--s-3);
 }
 
 label.inline {
@@ -77,32 +98,37 @@ label.inline {
   align-items: center;
   gap: 6px;
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 select {
-  padding: 8px 10px;
+  height: 44px;
+  padding: 0 var(--s-3);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
-
 
 button.cog {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
+  background: none;
+  border-color: transparent;
   color: var(--dim);
 }
 
-button.cog:hover {
+button.cog:hover:not(:disabled) {
+  background: var(--raised);
+  border-color: transparent;
   color: var(--text);
-  border-color: var(--accent);
 }
 
 .dialog.settings {
@@ -113,7 +139,7 @@ button.cog:hover {
 
 .settings-search {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: var(--s-3);
 }
 
 .config-list {
@@ -122,7 +148,7 @@ button.cog:hover {
   max-height: 48vh;
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   background: var(--bg);
 }
 
@@ -130,12 +156,13 @@ button.cog:hover {
   position: sticky;
   top: 0;
   padding: 5px 10px;
-  background: var(--panel);
+  background: var(--raised);
   border-bottom: 1px solid var(--line);
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--fs-caps);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
 }
 
 .config-row {
@@ -143,12 +170,12 @@ button.cog:hover {
   align-items: flex-start;
   gap: 9px;
   padding: 6px 10px;
-  border-bottom: 1px solid rgba(46, 50, 60, 0.4);
+  border-bottom: 1px solid var(--line);
   cursor: pointer;
 }
 
 .config-row:hover {
-  background: rgba(76, 154, 255, 0.07);
+  background: var(--current-wash);
 }
 
 .config-row input {
@@ -166,17 +193,17 @@ button.cog:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .config-tag {
   padding: 1px 6px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   color: var(--dim);
-  font-size: 10px;
+  font-size: var(--fs-caps);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 .config-where {
@@ -184,8 +211,8 @@ button.cog:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--dim);
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caps);
 }
 
 .pack-summary {
@@ -198,41 +225,41 @@ button.cog:hover {
 .pack-chip {
   padding: 4px 10px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--dim);
-  font-size: 12px;
+  font-size: var(--fs-caps);
 }
 
 .cache-label {
   display: block;
+  font-weight: 500;
 }
 
 .cache-cost {
   display: block;
   margin-top: 1px;
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--fs-caps);
 }
 
 .caution-flag {
   margin-left: 6px;
   padding: 1px 6px;
-  border: 1px solid var(--danger);
-  border-radius: 3px;
-  color: #ff9ea1;
-  font-size: 10px;
+  border: 1px solid var(--caution);
+  border-radius: var(--r-sm);
+  color: var(--caution);
+  font-size: var(--fs-caps);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   cursor: help;
 }
 
 .problems {
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  padding: var(--s-2) var(--s-3);
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
 }
 
 .problems summary {
@@ -241,11 +268,13 @@ button.cog:hover {
 }
 
 .problems ul {
-  margin: 8px 0 0;
+  margin: var(--s-2) 0 0;
   padding-left: 18px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: var(--dim);
 }
+
+/* --- search results ------------------------------------------------------ */
 
 .file-results {
   display: flex;
@@ -255,37 +284,38 @@ button.cog:hover {
 
 .file-result {
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--r-md);
 }
 
 .file-result.open {
   border-color: var(--line);
-  background: rgba(30, 33, 40, 0.5);
+  background: var(--panel);
 }
 
 button.file-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   width: 100%;
   padding: 7px 10px;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
+  font-weight: 400;
   text-align: left;
   cursor: pointer;
 }
 
-button.file-head:hover {
-  background: rgba(76, 154, 255, 0.07);
+button.file-head:hover:not(:disabled) {
+  background: var(--current-wash);
 }
 
 .caret {
   width: 10px;
   color: var(--dim);
-  font-size: 10px;
+  font-size: var(--fs-caps);
 }
 
 .file-path {
@@ -293,26 +323,27 @@ button.file-head:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-family: var(--font-mono);
 }
 
 .file-count {
   color: var(--dim);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
 }
 
 .file-lines {
-  padding: 2px 10px 8px 28px;
+  padding: 2px 10px var(--s-2) 28px;
   overflow-x: auto;
 }
 
 .match-line {
   display: flex;
-  gap: 12px;
+  gap: var(--s-3);
   padding: 2px 0;
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
   white-space: pre;
 }
 
@@ -326,12 +357,13 @@ button.file-head:hover {
 
 .match-line code {
   color: var(--text);
+  font-family: inherit;
 }
 
 .match-line mark {
-  background: rgba(255, 200, 0, 0.25);
-  color: #ffd75e;
-  border-radius: 2px;
+  background: var(--caution-wash);
+  color: var(--caution);
+  border-radius: var(--r-sm);
 }
 
 .match-line.more {
@@ -340,41 +372,50 @@ button.file-head:hover {
   font-style: italic;
 }
 
+/* --- forms --------------------------------------------------------------- */
+
 .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--s-3);
+  padding: var(--s-4);
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-md);
 }
 
 .controls label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
   flex: 1 1 260px;
   color: var(--dim);
-  font-size: 12px;
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 input[type="text"],
+input:not([type]),
 .controls input,
 .confirm input {
-  padding: 8px 10px;
+  height: 44px;
+  padding: 0 var(--s-3);
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   color: var(--text);
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+.controls input[type="checkbox"] {
+  height: auto;
 }
 
 .chips {
@@ -385,75 +426,97 @@ input:focus {
   order: 3;
 }
 
-.chip {
+button.chip {
+  height: auto;
   padding: 4px 10px;
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--dim);
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caps);
+  font-weight: 400;
   cursor: pointer;
 }
 
-.chip:hover {
-  border-color: var(--accent);
+button.chip:hover:not(:disabled) {
+  border-color: var(--current);
   color: var(--text);
 }
 
 button {
-  padding: 9px 16px;
-  background: var(--panel);
+  height: 44px;
+  padding: 0 var(--s-4);
+  background: var(--raised);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    filter var(--t-quick) var(--ease-out);
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--current);
 }
 
 button:disabled {
-  opacity: 0.4;
+  color: var(--dim);
   cursor: not-allowed;
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #06121f;
-  font-weight: 600;
+  background: var(--current);
+  border-color: var(--current);
+  color: var(--on-accent);
+  font-weight: 700;
 }
 
 button.danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
-  font-weight: 600;
+  color: var(--on-accent);
+  font-weight: 700;
 }
+
+button.primary:hover:not(:disabled),
+button.danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button.primary:disabled,
+button.danger:disabled {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--dim);
+}
+
+/* --- status -------------------------------------------------------------- */
 
 .status,
 .note,
 .empty {
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .error {
-  padding: 10px 12px;
-  background: rgba(229, 72, 77, 0.12);
+  padding: 10px var(--s-3);
+  background: var(--danger-wash);
   border: 1px solid var(--danger);
-  border-radius: 6px;
-  color: #ff9ea1;
+  border-radius: var(--r-md);
+  color: var(--danger);
 }
 
 .outcome {
-  padding: 10px 12px;
-  background: rgba(76, 154, 255, 0.12);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  padding: 10px var(--s-3);
+  background: var(--current-wash);
+  border: 1px solid var(--current);
+  border-radius: var(--r-md);
 }
 
 .outcome p {
@@ -461,28 +524,24 @@ button.danger {
 }
 
 .failures {
-  margin: 8px 0 0;
+  margin: var(--s-2) 0 0;
   padding-left: 18px;
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  color: #ff9ea1;
-}
-
-.zapping {
-  margin: 16px 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  color: var(--danger);
 }
 
 .zapping .bar {
   height: 4px;
   background: var(--line);
-  border-radius: 2px;
+  border-radius: var(--r-pill);
   overflow: hidden;
 }
 
 .zapping .fill {
   height: 100%;
   background: var(--danger);
-  transition: width 120ms linear;
+  transition: width var(--t-quick) linear;
 }
 
 .zapping .status {
@@ -490,41 +549,48 @@ button.danger {
 }
 
 .zapping .current {
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  opacity: 0.7;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  color: var(--dim);
 }
 
 .summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin: 24px 0 12px;
-  padding-bottom: 12px;
+  align-items: baseline;
+  gap: var(--s-5);
+  padding-bottom: var(--s-3);
   border-bottom: 1px solid var(--line);
   color: var(--dim);
 }
 
 .summary strong {
   color: var(--text);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-title);
+  font-variant-numeric: tabular-nums;
 }
 
 .strategy {
   margin-left: auto;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
 }
 
 .bulk {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--s-2);
 }
+
+/* --- results table ------------------------------------------------------- */
 
 .hits {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--fs-body);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
 }
 
 .hits th {
@@ -544,17 +610,20 @@ button.sort {
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 8px;
+  height: 36px;
+  padding: 0 var(--s-2);
   background: none;
   border: none;
   border-radius: 0;
   color: var(--dim);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
-button.sort:hover {
+button.sort:hover:not(:disabled) {
   color: var(--text);
 }
 
@@ -563,13 +632,14 @@ button.sort.active {
 }
 
 button.sort .arrow {
-  font-size: 9px;
+  font-size: var(--fs-caps);
   line-height: 1;
 }
 
 .hits td {
-  padding: 7px 8px;
-  border-bottom: 1px solid rgba(46, 50, 60, 0.5);
+  height: 44px;
+  padding: 0 var(--s-2);
+  border-bottom: 1px solid var(--line);
 }
 
 .hits tbody tr {
@@ -577,7 +647,7 @@ button.sort .arrow {
 }
 
 .hits tbody tr:hover {
-  background: rgba(76, 154, 255, 0.07);
+  background: var(--current-wash);
 }
 
 .hits tr.spared {
@@ -591,7 +661,7 @@ button.sort .arrow {
 }
 
 .hits .path {
-  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-family: var(--font-mono);
   max-width: 620px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -602,6 +672,7 @@ button.sort .arrow {
 
 .num {
   text-align: right;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -626,10 +697,11 @@ button.twist {
   align-items: center;
   justify-content: center;
   width: 18px;
+  height: 18px;
   padding: 0;
   background: none;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   cursor: pointer;
 }
 
@@ -639,13 +711,14 @@ button.twist:hover .caret {
 
 .rule-count {
   color: var(--dim);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .rule-chosen {
-  margin-left: 8px;
-  color: var(--accent);
-  font-size: 11px;
+  margin-left: var(--s-2);
+  color: var(--current);
+  font-size: var(--fs-caps);
 }
 
 .hits tr.rule.open td {
@@ -653,11 +726,9 @@ button.twist:hover .caret {
 }
 
 .hits tr.member td {
-  padding-top: 4px;
-  padding-bottom: 4px;
+  height: 36px;
   border-bottom: none;
-  background: rgba(30, 33, 40, 0.5);
-  font-size: 12px;
+  background: var(--raised);
 }
 
 .hits tr.member .path {
@@ -667,53 +738,52 @@ button.twist:hover .caret {
 /* Close the block of instances off from the next rule. */
 .hits tr.member:last-child td,
 .hits tr.member:has(+ tr.rule) td {
-  border-bottom: 1px solid rgba(46, 50, 60, 0.5);
+  border-bottom: 1px solid var(--line);
 }
 
-.app > button.danger {
-  margin-top: 20px;
-}
+/* --- dialogs ------------------------------------------------------------- */
 
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--scrim);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--s-5);
 }
 
 .dialog {
   width: min(560px, 100%);
   max-height: 85vh;
   overflow-y: auto;
-  padding: 24px;
+  padding: var(--s-5);
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
 }
 
 .dialog h2 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: var(--fs-title);
+  font-weight: 600;
 }
 
 .reclaim {
-  margin: 0 0 16px;
+  margin: 0 0 var(--s-4);
   color: var(--dim);
 }
 
 .preview {
-  margin: 0 0 16px;
-  padding: 12px;
+  margin: 0 0 var(--s-4);
+  padding: var(--s-3) var(--s-4);
   max-height: 180px;
   overflow-y: auto;
   list-style: none;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
 }
 
 .preview li {
@@ -728,42 +798,42 @@ button.twist:hover .caret {
 }
 
 .refused {
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  background: rgba(229, 72, 77, 0.1);
-  border: 1px solid var(--danger);
-  border-radius: 6px;
-  font-size: 12px;
+  margin-bottom: var(--s-4);
+  padding: 10px var(--s-3);
+  background: var(--refused-wash);
+  border: 1px solid var(--refused);
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
 }
 
 .refused ul {
   margin: 6px 0 0;
   padding-left: 18px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .permanent,
 .confirm {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: var(--s-4);
   color: var(--dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .permanent input {
-  margin-right: 8px;
+  margin-right: var(--s-2);
 }
 
 .confirm input {
   display: block;
-  width: 120px;
-  margin-top: 6px;
+  width: 160px;
+  margin-top: var(--s-2);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--s-3);
 }
 
 /* --- root field ---------------------------------------------------------- */
@@ -771,10 +841,10 @@ button.twist:hover .caret {
 .root-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
   flex: 1 1 260px;
   color: var(--dim);
-  font-size: 12px;
+  font-size: var(--fs-caps);
 }
 
 .root-input {
@@ -789,9 +859,10 @@ button.twist:hover .caret {
 
 button.browse {
   flex: 0 0 auto;
-  padding: 8px 12px;
+  padding: 0 var(--s-3);
   color: var(--dim);
-  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 button.browse:hover:not(:disabled) {
@@ -807,7 +878,7 @@ button.browse:hover:not(:disabled) {
   width: min(720px, 100%);
   height: min(560px, 85vh);
   overflow: hidden;
-  padding: 14px;
+  padding: var(--s-4);
 }
 
 .picker-bar {
@@ -819,18 +890,20 @@ button.browse:hover:not(:disabled) {
 }
 
 button.crumb {
+  height: auto;
   padding: 3px 6px;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   color: var(--dim);
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: 400;
   cursor: pointer;
 }
 
 button.crumb:hover:not(:disabled) {
-  background: rgba(76, 154, 255, 0.07);
+  background: var(--current-wash);
   border-color: transparent;
   color: var(--text);
 }
@@ -853,8 +926,9 @@ button.crumb .sep {
 
 .picker-recent .label {
   color: var(--dim);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -865,34 +939,36 @@ button.crumb .sep {
   padding: 4px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-md);
 }
 
 button.row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   width: 100%;
-  padding: 4px 8px;
+  height: auto;
+  padding: 4px var(--s-2);
   background: none;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
+  font-weight: 400;
   text-align: left;
   cursor: pointer;
 }
 
 button.row:hover:not(:disabled) {
-  background: rgba(76, 154, 255, 0.07);
+  background: var(--current-wash);
   border-color: transparent;
 }
 
 /* The keyboard cursor has to read as a position even while the pointer is
    elsewhere, so it takes a border rather than the hover wash. */
 button.row.active {
-  background: rgba(76, 154, 255, 0.1);
-  border-color: var(--accent);
+  background: var(--current-wash);
+  border-color: var(--current);
 }
 
 button.row .row-name {
@@ -900,12 +976,12 @@ button.row .row-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-family: var(--font-mono);
 }
 
 button.row .row-note {
   color: var(--dim);
-  font-size: 11px;
+  font-size: var(--fs-caps);
 }
 
 button.row.hidden-entry .row-name {
@@ -922,20 +998,20 @@ button.row.up .row-name {
 }
 
 .picker-status {
-  margin: 6px 8px;
+  margin: 6px var(--s-2);
   color: var(--dim);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 .picker-error {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 .picker-foot {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
@@ -949,6 +1025,6 @@ button.row.up .row-name {
   direction: rtl;
   text-align: left;
   color: var(--dim);
-  font-family: ui-monospace, "Cascadia Code", monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
 }

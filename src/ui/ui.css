@@ -1,0 +1,10 @@
+/* Primitive styles. Tokens only; no domain names. */
+
+.wave-mark {
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
