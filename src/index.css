@@ -1148,7 +1148,7 @@ button.sort .arrow {
 }
 
 .command {
-  max-width: 620px;
+  max-width: 48ch;
   overflow: hidden;
   font-family: var(--font-mono);
   text-overflow: ellipsis;
@@ -1180,9 +1180,17 @@ button.sort .arrow {
   user-select: none;
 }
 
+/* Path cells take whatever width the other columns leave, and cut long
+   paths short. A zero max-width lets the table shrink them below their
+   text; the full path stays in the title. */
+.hits td.path,
+.hits td.where {
+  width: 100%;
+  max-width: 0;
+}
+
 .hits .path {
   font-family: var(--font-mono);
-  max-width: 620px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

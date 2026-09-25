@@ -101,9 +101,8 @@ import Demo from "./Demo.jsx";
     padding: 0 var(--gutter);
   }
 
+  /* The app grows with its content and scrolls with the page. */
   .stage :global(.demo-app) {
-    height: clamp(600px, 82vh, 860px);
-    overflow: auto;
     border: 1px solid var(--line);
     border-radius: var(--r-md);
   }
