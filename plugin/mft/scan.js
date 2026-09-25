@@ -126,7 +126,7 @@ async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal
  *          countMatch?: (name: string) => boolean,
  *          signal?: AbortSignal, clock?: () => number}} [opts]
  * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map, ownLatest: Map,
- *                    marks: Map<number, Set<string>>, drive: string,
+ *                    marks: import("./filenames.js").Marks, drive: string,
  *                    recordsDone: number, recordsTotal: number,
  *                    readMs: number}>}
  */

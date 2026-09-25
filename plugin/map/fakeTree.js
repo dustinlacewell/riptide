@@ -7,6 +7,7 @@
  */
 
 import { ROOT_RECORD } from "../mft/tree.js";
+import { createMarks } from "../mft/filenames.js";
 
 /**
  * @param {Record<string, number>} folders
@@ -40,7 +41,7 @@ export function fakeTree(folders, { drive = "C:" } = {}) {
   }
 
   return {
-    tree: { dirs, ownBytes, ownFiles, marks: new Map(), drive, recordsTotal: next },
+    tree: { dirs, ownBytes, ownFiles, marks: createMarks([]), drive, recordsTotal: next },
     byPath,
   };
 }

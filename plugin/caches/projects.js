@@ -37,7 +37,7 @@ const GIT = ".git";
 /**
  * The project and its last-touched time for each hit.
  *
- * @param {{dirs: Map, children: Map, marks: Map}} tree
+ * @param {{dirs: Map, children: Map, marks: import("../mft/filenames.js").Marks}} tree
  * @param {Map<number, number>} ownLatest newest file time per folder, ms
  * @param {object[]} records every hit's folder record from this pass
  * @param {string[]} [markers]
@@ -67,7 +67,7 @@ export function projectsOf(tree, ownLatest, records, markers = PROJECT_MARKERS) 
 /**
  * The project root above `record`, or null.
  *
- * @param {{dirs: Map, children: Map, marks: Map}} tree
+ * @param {{dirs: Map, children: Map, marks: import("../mft/filenames.js").Marks}} tree
  * @param {object} record a folder record
  * @param {string[]} markers file patterns, as PROJECT_MARKERS
  * @param {Map<number, {git: number|null, marker: number|null}>} [memo]
@@ -126,8 +126,8 @@ function holdsGit(tree, number) {
 }
 
 function holdsMarker(tree, number, ids) {
-  const marked = tree.marks?.get(number);
-  return marked !== undefined && ids.some((id) => marked.has(id));
+  const marks = tree.marks;
+  return marks !== undefined && ids.some((id) => marks.has(number, id));
 }
 
 function isGit(record) {

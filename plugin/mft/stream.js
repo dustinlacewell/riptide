@@ -7,13 +7,9 @@
  */
 
 import { applyFixup, parseFileRecord } from "./record.js";
-import { markFile } from "./filenames.js";
+import { createMarks, markFile, queryIds } from "./filenames.js";
 
 const READ_CHUNK = 8 * 1024 * 1024;
-
-// A file-name query that marks this many folders is not asking a narrow
-// question; holding the answer would cost memory the stream exists to save.
-const MAX_MARKS = 1_000_000;
 
 // Reading the clock per record would cost more than the parse; every few
 // thousand records is often enough to hit the interval.
@@ -70,7 +66,7 @@ export function intervalGate(clock, everyMs) {
  *          clock?: () => number}} opts
  * @returns {Promise<{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
  *            ownFiles: Map<number, number>, ownLatest: Map<number, number>,
- *            marks: Map<number, Set<string>>, recordsDone: number}>}
+ *            marks: import("./filenames.js").Marks, recordsDone: number}>}
  *   ownLatest is the newest file modified time (Unix ms) directly in each
  *   directory; a directory with no dated files has no entry.
  */
@@ -90,12 +86,11 @@ export async function streamMftRecords({
   const ownBytes = new Map();
   const ownFiles = new Map();
   const ownLatest = new Map();
-  const marks = new Map();
+  const marks = createMarks(queryIds(query), recordsTotal);
   const due = intervalGate(clock, EMIT_MS);
 
   let recordNumber = 0;
   let bytesRead = 0;
-  let marked = 0;
   let matches = 0;
 
   const report = () =>
@@ -148,14 +143,7 @@ export async function streamMftRecords({
         ownFiles.set(entry.parent, (ownFiles.get(entry.parent) ?? 0) + 1);
         foldLatest(ownLatest, entry.parent, entry.mtime);
 
-        if (query) {
-          marked += markFile(marks, query, entry.name, entry.parent);
-          if (marked > MAX_MARKS) {
-            throw new Error(
-              `file-name query marked more than ${MAX_MARKS.toLocaleString()} folders; a pack pattern is too broad`,
-            );
-          }
-        }
+        if (query) markFile(marks, query, entry.name, entry.parent);
       }
 
       consumed += BigInt(usable > 0 ? usable : chunk.length);

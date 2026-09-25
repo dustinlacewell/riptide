@@ -17,10 +17,11 @@
 import { childIndex, findOutermostMatches, resolvePath } from "../mft/tree.js";
 import { matchTree } from "../caches/match.js";
 import { screenPaths } from "../zap.js";
+import { createMarks } from "../mft/filenames.js";
 import { CACHE_CAUTION, CACHE_SAFE, NAME_HIT, REFUSED } from "./flags.js";
 
 /**
- * @param {{dirs: Map, marks: Map, drive: string}} volume
+ * @param {{dirs: Map, marks?: import("../mft/filenames.js").Marks, drive: string}} volume
  * @param {{entries?: object[], patterns?: string[], drives?: string[],
  *          env?: object}} opts
  * @returns {Map<number, {flags: number, label?: string}>} by record number
@@ -51,7 +52,7 @@ function markCaches(marks, volume, entries, ctx) {
   const tree = {
     dirs: volume.dirs,
     children: childIndex(volume.dirs),
-    marks: volume.marks ?? new Map(),
+    marks: volume.marks ?? createMarks([]),
     drive: volume.drive,
   };
   const { hits, refused } = matchTree(tree, entries, ctx);

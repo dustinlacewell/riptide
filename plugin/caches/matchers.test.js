@@ -12,7 +12,7 @@ import { matchTree } from "./match.js";
 import { collectNeeds } from "./needs.js";
 import { matcherFor } from "./matchers/index.js";
 import { childIndex, ROOT_RECORD } from "../mft/tree.js";
-import { buildNameQuery, markFile } from "../mft/filenames.js";
+import { buildNameQuery, createMarks, markFile, queryIds } from "../mft/filenames.js";
 
 /**
  * Build a tree the way readVolumeTree would hand it over.
@@ -39,7 +39,7 @@ function volume(layout, entries, drive = "C:") {
   };
 
   const query = buildNameQuery(collectNeeds(entries));
-  const marks = new Map();
+  const marks = createMarks(queryIds(query));
   for (const [folder, files] of Object.entries(layout)) {
     const number = ensure(folder);
     if (!query) continue;

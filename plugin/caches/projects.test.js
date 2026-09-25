@@ -8,7 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { childIndex } from "../mft/tree.js";
-import { markFile } from "../mft/filenames.js";
+import { createMarks, markFile, queryIds } from "../mft/filenames.js";
 import { PROJECT_MARKERS, projectOf, projectsOf } from "./projects.js";
 import { projectNeeds } from "./needs.js";
 import { validatePack } from "./pack.js";
@@ -47,15 +47,16 @@ const DIRS = new Map(
   ].map((d) => [d.recordNumber, d]),
 );
 
+// Marks are stored under lowercased pattern ids, as the stream writes them.
+const MARKS = createMarks(["package.json", "*.csproj", "cargo.toml"]);
+MARKS.set(13, "package.json");
+MARKS.set(16, "*.csproj");
+MARKS.set(18, "cargo.toml");
+
 const TREE = {
   dirs: DIRS,
   children: childIndex(DIRS),
-  // Marks are stored under lowercased pattern ids, as the stream writes them.
-  marks: new Map([
-    [13, new Set(["package.json"])],
-    [16, new Set(["*.csproj"])],
-    [18, new Set(["cargo.toml"])],
-  ]),
+  marks: MARKS,
 };
 
 const OWN = new Map([
@@ -135,7 +136,7 @@ function fakeReadTree(layout) {
     const ownBytes = new Map();
     const ownFiles = new Map();
     const ownLatest = new Map();
-    const marks = new Map();
+    const marks = createMarks(queryIds(query));
     for (const [folder, files] of Object.entries(layout)) {
       const number = ensure(folder);
       for (const [name, mtime] of files) {

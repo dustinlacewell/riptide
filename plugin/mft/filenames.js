@@ -16,6 +16,8 @@
  * the same string it asked for.
  */
 
+import { createBitset } from "./bitset.js";
+
 /**
  * @param {string[]} patterns
  * @returns {{exact: Set<string>, ext: Set<string>}|null} null when there is
@@ -67,28 +69,52 @@ export function matchName(query, name) {
 }
 
 /**
+ * The pattern ids a query can produce.
+ *
+ * @param {{exact: Set<string>, ext: Set<string>}|null} query
+ * @returns {string[]}
+ */
+export function queryIds(query) {
+  if (!query) return [];
+  return [...query.exact, ...[...query.ext].map((suffix) => "*" + suffix)];
+}
+
+/**
+ * @typedef {{has: (dir: number, id: string) => boolean,
+ *            set: (dir: number, id: string) => void}} Marks
+ */
+
+/**
+ * Which directories hold a file matching each pattern: one bitset per
+ * pattern id over directory record numbers. Memory is fixed by the record
+ * count and the pattern count, not by how many folders match.
+ *
+ * @param {string[]} ids pattern ids (see markId)
+ * @param {number} [size] record count, to reserve the bits up front
+ * @returns {Marks}
+ */
+export function createMarks(ids, size = 0) {
+  const byId = new Map(ids.map((id) => [id, createBitset(size)]));
+  return {
+    has: (dir, id) => byId.get(id)?.has(dir) ?? false,
+    set(dir, id) {
+      const bits = byId.get(id);
+      if (!bits) throw new Error(`mark for unknown pattern "${id}"`);
+      bits.set(dir);
+    },
+  };
+}
+
+/**
  * Record a file's matches against its parent directory.
  *
- * @param {Map<number, Set<string>>} marks parent record number -> pattern ids
+ * @param {Marks} marks
  * @param {{exact: Set<string>, ext: Set<string>}} query
  * @param {string} name the file's name
  * @param {number} parent the file's parent record number
- * @returns {number} how many new marks were added
  */
 export function markFile(marks, query, name, parent) {
-  const ids = matchName(query, name);
-  if (ids.length === 0) return 0;
-
-  let set = marks.get(parent);
-  if (!set) marks.set(parent, (set = new Set()));
-
-  let added = 0;
-  for (const id of ids) {
-    if (set.has(id)) continue;
-    set.add(id);
-    added += 1;
-  }
-  return added;
+  for (const id of matchName(query, name)) marks.set(parent, id);
 }
 
 /**

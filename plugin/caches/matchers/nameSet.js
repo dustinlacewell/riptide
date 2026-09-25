@@ -52,15 +52,15 @@ export function describeNameSet(spec) {
 /**
  * Does directory `dirNumber` hold any of the listed names?
  *
- * @param {{children: Map, marks: Map}} tree
+ * @param {{children: Map, marks: import("../../mft/filenames.js").Marks}} tree
  * @param {number} dirNumber
  * @param {{folders: object[], files: string[]}} spec
  * @param {number} [except] a child record to ignore (the located folder
  *        itself, when looking beside it)
  */
 export function holdsAny(tree, dirNumber, spec, except = -1) {
-  const marked = tree.marks?.get(dirNumber);
-  if (marked && spec.files.some((f) => marked.has(markId(f)))) return true;
+  const marks = tree.marks;
+  if (marks && spec.files.some((f) => marks.has(dirNumber, markId(f)))) return true;
 
   if (spec.folders.length === 0) return false;
   for (const child of tree.children.get(dirNumber) ?? []) {

@@ -20,7 +20,8 @@ import { screenPaths } from "../zap.js";
 import { MATCHERS, matcherFor } from "./matchers/index.js";
 
 /**
- * @param {{dirs: Map, children: Map, marks: Map, drive: string}} tree
+ * @param {{dirs: Map, children: Map, marks: import("../mft/filenames.js").Marks,
+ *          drive: string}} tree
  * @param {object[]} entries validated pack entries, in priority order
  * @param {{env: object, drives: string[], scope: string|null}} ctx scope is
  *        lowercased with no trailing separator
