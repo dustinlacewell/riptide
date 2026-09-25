@@ -93,7 +93,7 @@ export function createTreeCache({
     if (kept && !opts.full && !kept.journal) {
       reason = "the drive had no change journal";
     } else if (kept && !opts.full && covers(kept.queryIds, wanted)) {
-      const updated = await update(key, kept, opts);
+      const updated = await tryUpdate(key, kept, opts);
       if (updated.done) return { tree: kept, how: "delta", reason: null, ms: clock() - started, changes: updated.changes };
       reason = updated.reason;
     } else if (kept && !opts.full) {
@@ -104,6 +104,19 @@ export function createTreeCache({
     held.delete(key);
     const tree = await readFull(key, opts);
     return { tree, how: "full", reason, changes: 0, ms: clock() - started };
+  }
+
+  /**
+   * An update that fails for any reason but a stop is a reason for a full
+   * read, not a failed request: the full read is the path that always works.
+   */
+  async function tryUpdate(key, kept, opts) {
+    try {
+      return await update(key, kept, opts);
+    } catch (err) {
+      opts.signal?.throwIfAborted();
+      return { done: false, reason: `the journal update failed: ${err.message}` };
+    }
   }
 
   /**

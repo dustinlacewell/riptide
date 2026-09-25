@@ -213,6 +213,30 @@ test("cache: when only a full read will do, it does one and says why", async () 
   assert.deepEqual(dumpTree(wrapped.tree, SPAN), await freshDump(run.volume));
 });
 
+test("cache: a journal that fails to read falls back to a full read", async () => {
+  const run = journaled(8);
+  let breakNext = false;
+  const read = async (o, l) => {
+    // One failed read of $J's data, which sits from cluster 100 on.
+    if (breakNext && o >= 100n * 4096n) {
+      breakNext = false;
+      throw new Error("bad sector");
+    }
+    return run.volume.read(o, l);
+  };
+  const cache = createTreeCache({
+    open: async () => ({ read, close: async () => {} }),
+    wallClock: () => run.world.now() + 60_000,
+  });
+  await cache.get("C:", { query: QUERY });
+  run.change(3);
+  breakNext = true;
+  const got = await cache.get("C:", { query: QUERY });
+  assert.equal(got.how, "full");
+  assert.match(got.reason, /journal update failed: bad sector/);
+  assert.deepEqual(dumpTree(got.tree, SPAN), await freshDump(run.volume));
+});
+
 test("cache: a drive with no journal reads in full every time", async () => {
   const volume = buildVolume({ records: RECORDS });
   const cache = cacheOn(volume);
