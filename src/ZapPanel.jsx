@@ -150,7 +150,7 @@ export default function ZapPanel({
       {progress && (
         <p className="status">
           {progress.stage}
-          {progress.count ? ` — ${progress.count.toLocaleString()}` : ""}
+          {progress.recordsDone ? ` — ${progress.recordsDone.toLocaleString()}` : ""}
           {progress.reason ? ` (${progress.reason})` : ""}
         </p>
       )}

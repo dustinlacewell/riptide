@@ -235,7 +235,9 @@ export default function CachePanel({
                   : ""
               }`
             : progress.stage}
-          {progress.count ? ` — ${progress.count.toLocaleString()} records` : ""}
+          {progress.recordsDone
+            ? ` — ${progress.recordsDone.toLocaleString()} records`
+            : ""}
         </p>
       )}
 

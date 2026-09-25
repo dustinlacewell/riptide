@@ -227,6 +227,8 @@ async function scanRoute(req, res) {
     result = await scanVolume({
       root,
       matches,
+      // The same test, counted live while the MFT streams.
+      countMatch: matches,
       signal,
       onProgress: (note) => res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
     });
@@ -242,6 +244,7 @@ async function scanRoute(req, res) {
       strategy: result.strategy,
       reason: result.reason ?? null,
       elapsedMs: Date.now() - started,
+      stats: result.stats,
       hits: result.hits,
     }) + "\n",
   );

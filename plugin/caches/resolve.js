@@ -69,11 +69,13 @@ export async function resolveEntries(entries, {
       continue;
     }
 
+    onProgress({ stage: "index", ...where });
     const children = childIndex(volume.dirs);
     const tree = { dirs: volume.dirs, children, marks: volume.marks, drive };
     const { hits, refused } = matchTree(tree, entries, ctx);
     errors.push(...refused.map((r) => `${r.path} refused: ${r.reason}`));
 
+    onProgress({ stage: "size", ...where });
     const sized = sizeHits(volume, children, hits);
 
     // This drive is finished; hand its results over rather than holding them

@@ -15,65 +15,97 @@
  * Every loop takes an optional AbortSignal and checks it between chunks or
  * directory levels. An aborted run throws the signal's reason, closes what
  * it opened, and never falls back to the other strategy.
+ *
+ * Progress stages, in order:
+ *
+ *   mft:  boot, mft-header {recordsTotal, mftBytes}, mft-stream {...},
+ *         mft-done {recordsDone, recordsTotal, readMs}, index, size
+ *   walk: mft-unavailable {reason}, walk {dirs, matches},
+ *         sizing {done, total}
  */
 
-import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
 import { parseBootSector } from "./boot.js";
 import { runsToByteRanges } from "./runlist.js";
-import { applyFixup, parseFileRecord, extractMftRuns } from "./record.js";
-import { markFile } from "./filenames.js";
+import { applyFixup, extractMftRuns } from "./record.js";
+import { recordsIn, streamMftRecords } from "./stream.js";
 import {
   resolvePath,
   subtreeSizes,
   findOutermostMatches,
 } from "./tree.js";
 
-const READ_CHUNK = 8 * 1024 * 1024;
-
-// A file-name query that marks this many folders is not asking a narrow
-// question; holding the answer would cost memory the stream exists to save.
-const MAX_MARKS = 1_000_000;
+const now = () => performance.now();
 
 /**
  * @param {{root: string, matches: (name: string) => boolean,
- *          onProgress?: (n: {stage: string, count?: number}) => void,
- *          signal?: AbortSignal}} opts
+ *          countMatch?: (name: string) => boolean,
+ *          onProgress?: (n: {stage: string}) => void,
+ *          signal?: AbortSignal, clock?: () => number}} opts
+ *   countMatch, when given, makes the MFT stream report a running match
+ *   count. It may be the same test as matches.
  * @returns {Promise<{strategy: "mft"|"walk", reason?: string,
  *                    hits: Array<{path: string, bytes: string, files: number,
- *                                 mtime: string|null}>}>}
+ *                                 mtime: string|null}>,
+ *                    stats: {records: number, readMs: number,
+ *                            indexMs: number, sizeMs: number}}>}
  */
-export async function scanVolume({ root, matches, onProgress = () => {}, signal }) {
+export async function scanVolume({
+  root,
+  matches,
+  countMatch,
+  onProgress = () => {},
+  signal,
+  clock = now,
+}) {
   const drive = driveLetterOf(root);
+  const opts = { root, matches, countMatch, onProgress, signal, clock };
 
   if (drive) {
     try {
-      const hits = await scanViaMft({ drive, root, matches, onProgress, signal });
-      return { strategy: "mft", hits };
+      return { strategy: "mft", ...(await scanViaMft({ ...opts, drive })) };
     } catch (err) {
       // A stop is not a failed MFT read; walking the tree instead would
       // carry on with the work the caller just cancelled.
       signal?.throwIfAborted();
       onProgress({ stage: "mft-unavailable", reason: err.message });
-      const hits = await scanViaWalk({ root, matches, onProgress, signal });
-      return { strategy: "walk", reason: err.message, hits };
+      return { strategy: "walk", reason: err.message, ...(await scanViaWalk(opts)) };
     }
   }
 
-  const hits = await scanViaWalk({ root, matches, onProgress, signal });
-  return { strategy: "walk", reason: "root is not a drive path", hits };
+  return {
+    strategy: "walk",
+    reason: "root is not a drive path",
+    ...(await scanViaWalk(opts)),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // MFT strategy
 // ---------------------------------------------------------------------------
 
-async function scanViaMft({ drive, root, matches, onProgress, signal }) {
-  const tree = await readVolumeTree(drive, { onProgress, signal });
-  onProgress({ stage: "tree", count: tree.dirs.size });
-  return buildHits({ ...tree, drive, root, matches });
+async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal, clock }) {
+  const tree = await readVolumeTree(drive, { onProgress, signal, countMatch, clock });
+
+  const indexStart = clock();
+  onProgress({ stage: "index" });
+  const resolved = matchHits({ ...tree, root, matches });
+
+  const sizeStart = clock();
+  onProgress({ stage: "size" });
+  const hits = sizeHits(tree, resolved);
+
+  return {
+    hits,
+    stats: {
+      records: tree.recordsDone,
+      readMs: tree.readMs,
+      indexMs: sizeStart - indexStart,
+      sizeMs: clock() - sizeStart,
+    },
+  };
 }
 
 /**
@@ -90,140 +122,68 @@ async function scanViaMft({ drive, root, matches, onProgress, signal }) {
  * @param {string} drive e.g. "C:"
  * @param {{onProgress?: Function,
  *          query?: {exact: Set<string>, ext: Set<string>}|null,
- *          signal?: AbortSignal}} [opts]
+ *          countMatch?: (name: string) => boolean,
+ *          signal?: AbortSignal, clock?: () => number}} [opts]
  * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map,
- *                    marks: Map<number, Set<string>>, drive: string}>}
+ *                    marks: Map<number, Set<string>>, drive: string,
+ *                    recordsDone: number, recordsTotal: number,
+ *                    readMs: number}>}
  */
 export async function readVolumeTree(
   drive,
-  { onProgress = () => {}, query = null, signal } = {},
+  { onProgress = () => {}, query = null, countMatch = null, signal, clock = now } = {},
 ) {
   signal?.throwIfAborted();
+  const started = clock();
   const handle = await fsp.open(`\\\\.\\${drive}`, "r");
+  const read = (offset, length) => readAt(handle, offset, length);
 
   try {
     onProgress({ stage: "boot" });
-    const boot = parseBootSector(await readAt(handle, 0n, 512));
+    const boot = parseBootSector(await read(0n, 512));
 
-    onProgress({ stage: "mft-header" });
-    const zeroRecord = await readAt(
-      handle,
-      boot.mftOffset,
-      boot.bytesPerFileRecord,
-    );
+    const zeroRecord = await read(boot.mftOffset, boot.bytesPerFileRecord);
     applyFixup(zeroRecord, boot.bytesPerSector);
-    const ranges = runsToByteRanges(
-      extractMftRuns(zeroRecord),
-      boot.bytesPerCluster,
-    );
+    const ranges = runsToByteRanges(extractMftRuns(zeroRecord), boot.bytesPerCluster);
 
-    onProgress({ stage: "mft-stream" });
-    const { dirs, ownBytes, ownFiles, marks } = await streamMftRecords({
-      handle,
+    const { recordsTotal, mftBytes } = recordsIn(ranges, boot.bytesPerFileRecord);
+    onProgress({ stage: "mft-header", recordsTotal, mftBytes: Number(mftBytes) });
+
+    const tree = await streamMftRecords({
+      read,
       ranges,
       boot,
       query,
+      countMatch,
       onProgress,
       signal,
+      clock,
     });
 
-    return { dirs, ownBytes, ownFiles, marks, drive };
+    const readMs = clock() - started;
+    onProgress({ stage: "mft-done", recordsDone: tree.recordsDone, recordsTotal, readMs });
+
+    return { ...tree, drive, recordsTotal, readMs };
   } finally {
     await handle.close();
   }
 }
 
-/**
- * Read every MFT extent sequentially and parse the records within.
- *
- * Only directory records are retained. A volume with millions of files
- * cannot afford to hold a JS object per file — on this machine that came to
- * 1.3 GB of heap and killed the dev server. Files are folded into their
- * parent's running total as they stream past and then dropped, so peak
- * memory tracks the directory count rather than the file count.
- *
- * @returns {{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
- *            ownFiles: Map<number, number>, marks: Map<number, Set<string>>}}
- */
-async function streamMftRecords({ handle, ranges, boot, query, onProgress, signal }) {
-  const recordSize = boot.bytesPerFileRecord;
-  const dirs = new Map();
-  const ownBytes = new Map();
-  const ownFiles = new Map();
-  const marks = new Map();
-
-  let recordNumber = 0;
-  let parsed = 0;
-  let marked = 0;
-
-  for (const range of ranges) {
-    let consumed = 0n;
-
-    while (consumed < range.length) {
-      signal?.throwIfAborted();
-      const remaining = range.length - consumed;
-      const want = remaining < BigInt(READ_CHUNK) ? Number(remaining) : READ_CHUNK;
-      const chunk = await readAt(handle, range.offset + consumed, want);
-      if (chunk.length === 0) break;
-
-      const usable = chunk.length - (chunk.length % recordSize);
-
-      for (let off = 0; off + recordSize <= usable; off += recordSize) {
-        const rec = chunk.subarray(off, off + recordSize);
-        const current = recordNumber++;
-
-        try {
-          applyFixup(rec, boot.bytesPerSector);
-        } catch {
-          // A torn record on a live volume. Skip it rather than abort the
-          // whole scan; one bad record costs us one file, not the run.
-          continue;
-        }
-
-        const entry = parseFileRecord(rec, current);
-        if (!entry) continue;
-
-        if (entry.isDirectory) {
-          dirs.set(current, entry);
-        } else {
-          // Fold into the parent's total, then let the record go.
-          ownBytes.set(entry.parent, (ownBytes.get(entry.parent) ?? 0n) + entry.size);
-          ownFiles.set(entry.parent, (ownFiles.get(entry.parent) ?? 0) + 1);
-
-          if (query) {
-            marked += markFile(marks, query, entry.name, entry.parent);
-            if (marked > MAX_MARKS) {
-              throw new Error(
-                `file-name query marked more than ${MAX_MARKS.toLocaleString()} folders; a pack pattern is too broad`,
-              );
-            }
-          }
-        }
-
-        if (++parsed % 50000 === 0) {
-          onProgress({ stage: "mft-stream", count: parsed });
-        }
-      }
-
-      consumed += BigInt(usable > 0 ? usable : chunk.length);
-    }
-  }
-
-  return { dirs, ownBytes, ownFiles, marks };
-}
-
-function buildHits({ dirs, ownBytes, ownFiles, drive, root, matches }) {
+/** The outermost matching directories under root, with their full paths. */
+function matchHits({ dirs, drive, root, matches }) {
   const wanted = normalize(root);
-  const outermost = findOutermostMatches(dirs, matches);
-
   const resolved = [];
-  for (const rec of outermost) {
+
+  for (const rec of findOutermostMatches(dirs, matches)) {
     const full = resolvePath(dirs, rec, drive);
     if (!full) continue;
     if (!normalize(full).startsWith(wanted)) continue;
     resolved.push({ record: rec, path: full });
   }
+  return resolved;
+}
 
+function sizeHits({ dirs, ownBytes, ownFiles }, resolved) {
   const totals = subtreeSizes(
     dirs,
     ownBytes,
@@ -241,14 +201,20 @@ function buildHits({ dirs, ownBytes, ownFiles, drive, root, matches }) {
         mtime: record.mtime ? record.mtime.toISOString() : null,
       };
     })
-    .sort((a, b) => Number(BigInt(b.bytes) - BigInt(a.bytes)));
+    .sort(bySizeDescending);
 }
 
 // ---------------------------------------------------------------------------
 // Walk strategy
 // ---------------------------------------------------------------------------
 
-export async function scanViaWalk({ root, matches, onProgress = () => {}, signal }) {
+/**
+ * @returns {Promise<{hits: object[], stats: {records: number, readMs: number,
+ *                    indexMs: number, sizeMs: number}}>}
+ *   records counts the directories read.
+ */
+export async function scanViaWalk({ root, matches, onProgress = () => {}, signal, clock = now }) {
+  const started = clock();
   const found = [];
   let level = [root];
   let visited = 0;
@@ -276,20 +242,29 @@ export async function scanViaWalk({ root, matches, onProgress = () => {}, signal
       }
     }
 
-    onProgress({ stage: "walk", count: visited });
+    onProgress({ stage: "walk", dirs: visited, matches: found.length });
     level = next;
   }
 
-  onProgress({ stage: "sizing", count: found.length });
+  const sizeStart = clock();
+  onProgress({ stage: "sizing", done: 0, total: found.length });
 
   const hits = [];
   for (const batch of chunk(found, 8)) {
     signal?.throwIfAborted();
     hits.push(...(await Promise.all(batch.map((dir) => measureSubtree(dir, signal)))));
-    onProgress({ stage: "sizing", count: hits.length });
+    onProgress({ stage: "sizing", done: hits.length, total: found.length });
   }
 
-  return hits.sort((a, b) => Number(BigInt(b.bytes) - BigInt(a.bytes)));
+  return {
+    hits: hits.sort(bySizeDescending),
+    stats: {
+      records: visited,
+      readMs: sizeStart - started,
+      indexMs: 0,
+      sizeMs: clock() - sizeStart,
+    },
+  };
 }
 
 function* chunk(items, size) {
@@ -368,6 +343,10 @@ async function sizeOf(file) {
 
 // ---------------------------------------------------------------------------
 
+function bySizeDescending(a, b) {
+  return Number(BigInt(b.bytes) - BigInt(a.bytes));
+}
+
 async function readAt(handle, offset, length) {
   const buf = Buffer.allocUnsafe(length);
   const { bytesRead } = await handle.read(buf, 0, length, Number(offset));
@@ -382,5 +361,3 @@ function driveLetterOf(root) {
 function normalize(p) {
   return path.resolve(p).toLowerCase().replace(/\\+$/, "");
 }
-
-export { fs };

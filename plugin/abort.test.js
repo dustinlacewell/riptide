@@ -45,7 +45,7 @@ test("the walk stops at the next level once the signal fires", async (t) => {
       signal: controller.signal,
       onProgress: (note) => {
         if (note.stage !== "walk") return;
-        levels.push(note.count);
+        levels.push(note.dirs);
         controller.abort();
       },
     }),
@@ -59,7 +59,7 @@ test("the walk runs to the end without a signal", async (t) => {
   const root = await deepTree();
   t.after(() => fsp.rm(root, { recursive: true, force: true }));
 
-  const hits = await scanViaWalk({ root, matches: (n) => n === "c" });
+  const { hits } = await scanViaWalk({ root, matches: (n) => n === "c" });
   assert.equal(hits.length, 1);
   assert.equal(path.basename(hits[0].path), "c");
 });

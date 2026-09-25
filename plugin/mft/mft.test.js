@@ -12,6 +12,7 @@ import { parseBootSector } from "./boot.js";
 import { decodeRunList, runsToByteRanges } from "./runlist.js";
 import { applyFixup, parseFileRecord } from "./record.js";
 import { resolvePath, subtreeSizes, findOutermostMatches, indexRecords } from "./tree.js";
+import { intervalGate, recordsIn, streamMftRecords } from "./stream.js";
 
 // --- boot sector -----------------------------------------------------------
 
@@ -272,6 +273,99 @@ test("tree: a nested match is excluded so bytes are not double-counted", () => {
   const matches = findOutermostMatches(tree(), (n) => n === "node_modules");
   assert.equal(matches.length, 1, "the inner node_modules is covered by the outer one");
   assert.equal(matches[0].recordNumber, 13);
+});
+
+// --- stream ----------------------------------------------------------------
+
+const RECORD = 1024;
+const BOOT = { bytesPerFileRecord: RECORD, bytesPerSector: 512 };
+
+/** An MFT of `count` records, blank except the ones given by number. */
+function makeMft(count, records) {
+  const buf = Buffer.alloc(count * RECORD);
+  for (const [n, spec] of Object.entries(records)) {
+    makeRecord(spec).copy(buf, Number(n) * RECORD);
+  }
+  return buf;
+}
+
+const readerOf = (buf) => async (offset, length) =>
+  buf.subarray(Number(offset), Number(offset) + length);
+
+/** A clock that moves `step` ms each time it is read. */
+function steppingClock(step) {
+  let t = 0;
+  return () => (t += step);
+}
+
+const MFT_RECORDS = {
+  5: { name: "node_modules", parent: 5, isDirectory: true },
+  6: { name: "node_modules", parent: 5, isDirectory: true },
+  7: { name: "src", parent: 5, isDirectory: true },
+  8: { name: "a.js", parent: 5, size: 100 },
+};
+
+async function stream(count, { step, countMatch } = {}) {
+  const buf = makeMft(count, MFT_RECORDS);
+  const notes = [];
+  const result = await streamMftRecords({
+    read: readerOf(buf),
+    ranges: [{ offset: 0n, length: BigInt(buf.length) }],
+    boot: BOOT,
+    countMatch,
+    onProgress: (n) => notes.push(n),
+    clock: steppingClock(step),
+  });
+  return { result, notes };
+}
+
+test("stream: recordsIn counts whole records across extents", () => {
+  const ranges = [{ length: 4096n }, { length: 2048n + 100n }];
+  assert.deepEqual(recordsIn(ranges, RECORD), { mftBytes: 6244n, recordsTotal: 6 });
+});
+
+test("stream: the interval gate opens once per interval", () => {
+  const due = intervalGate(steppingClock(40), 100);
+  // Made at 40; read at 80, 120, 160 (open), 200, 240, 280 (open).
+  assert.deepEqual([due(), due(), due(), due(), due(), due()], [false, false, true, false, false, true]);
+});
+
+test("stream: a clock past the interval reports at every 4096-record check", async () => {
+  const { notes, result } = await stream(3 * 4096 + 100, { step: 100 });
+  assert.deepEqual(
+    notes.map((n) => n.recordsDone),
+    [4096, 8192, 12288],
+  );
+  assert.equal(result.recordsDone, 3 * 4096 + 100);
+  for (const n of notes) {
+    assert.equal(n.stage, "mft-stream");
+    assert.equal(n.recordsTotal, 3 * 4096 + 100);
+    assert.equal(n.dirs, 3);
+    assert.ok(n.bytesRead >= n.recordsDone * RECORD);
+  }
+});
+
+test("stream: a clock inside the interval reports nothing", async () => {
+  const { notes } = await stream(3 * 4096, { step: 30 });
+  assert.deepEqual(notes, []);
+});
+
+test("stream: matches counts directories passing countMatch", async () => {
+  const { notes } = await stream(4096, { step: 100, countMatch: (n) => n === "node_modules" });
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].matches, 2);
+});
+
+test("stream: matches is absent without countMatch", async () => {
+  const { notes } = await stream(4096, { step: 100 });
+  assert.equal("matches" in notes[0], false);
+});
+
+test("stream: files fold into their parent and are not kept", async () => {
+  const { result } = await stream(16, { step: 0 });
+  assert.equal(result.dirs.size, 3);
+  assert.equal(result.ownBytes.get(5), 100n);
+  assert.equal(result.ownFiles.get(5), 1);
 });
 
 test("tree: sibling matches are both reported", () => {
