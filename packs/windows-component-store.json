@@ -1,0 +1,7 @@
+{
+  "id": "windows-component-store",
+  "label": "Windows component store",
+  "tool": "windows",
+  "action": "windows-component-cleanup",
+  "pack": "system"
+}

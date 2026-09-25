@@ -1,0 +1,7 @@
+{
+  "id": "docker-build-cache",
+  "label": "Docker build cache",
+  "tool": "docker",
+  "action": "docker-builder-prune",
+  "pack": "docker"
+}

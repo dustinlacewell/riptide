@@ -2,14 +2,6 @@
   "id": "pnpm-store",
   "label": "pnpm store",
   "tool": "pnpm",
-  "paths": [
-    "%LOCALAPPDATA%\\pnpm\\store",
-    "%LOCALAPPDATA%\\pnpm-store",
-    "~/.pnpm-store"
-  ],
-  "drivePaths": [
-    "\\.pnpm-store"
-  ],
-  "cost": "Re-downloaded on the next install.",
+  "action": "pnpm-store-prune",
   "pack": "javascript"
 }

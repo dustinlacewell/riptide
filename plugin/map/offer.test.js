@@ -148,7 +148,7 @@ test("offer → plan: map paths pass /plan; the depth rule still holds for them"
   const result = await offer([rec("Users\\dustin\\code\\app\\src")]);
   offered.add(result.paths, "map");
   offered.add(["C:\\top"], "map");
-  const plan = buildPlan([...result.paths, "C:\\top"], { offered, screen: screenPaths });
-  assert.deepEqual(plan.allowed, ["C:\\Users\\dustin\\code\\app\\src"]);
+  const plan = buildPlan({ paths: [...result.paths, "C:\\top"] }, { offered, screen: screenPaths });
+  assert.deepEqual(plan.items, [{ kind: "path", path: "C:\\Users\\dustin\\code\\app\\src" }]);
   assert.deepEqual(plan.refused.map((r) => r.reason), ["too close to drive root"]);
 });

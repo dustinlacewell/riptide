@@ -15,11 +15,18 @@
  *
  * Each entry needs at least one locate rule (paths, drivePaths, dirNames).
  * Filter rules (under, beside, contains) narrow what those locate.
+ *
+ * An entry may instead name an action ("action": "<id>"): a cleanup done by
+ * the tool's own command. The command lives in plugin/actions, never in the
+ * pack. Such an entry has no locate or filter rules. Its risk is the
+ * action's; a pack "caution" can add a warning but never lift one.
  */
 
+import { actionFor } from "../actions/index.js";
 import { matcherFor, MATCHERS } from "./matchers/index.js";
 
 const META_KEYS = new Set(["id", "label", "tool", "pack", "cost", "caution"]);
+const ACTION_KEY = "action";
 
 /**
  * Validate a parsed pack.
@@ -89,6 +96,7 @@ export function whereOf(entry) {
 function parseEntry(entry, seen) {
   const meta = metaProblem(entry, seen);
   if (meta) return { error: meta };
+  if (ACTION_KEY in entry) return parseActionEntry(entry);
 
   const unknown = Object.keys(entry).find((k) => !META_KEYS.has(k) && !matcherFor(k));
   if (unknown) return { error: `unknown key "${unknown}"` };
@@ -119,6 +127,35 @@ function parseEntry(entry, seen) {
     riskNote: caution,
     perProject: locators.some((m) => m.perProject),
     match,
+  };
+}
+
+function parseActionEntry(entry) {
+  const unknown = Object.keys(entry).find((k) => !META_KEYS.has(k) && k !== ACTION_KEY);
+  if (unknown) {
+    return {
+      error: matcherFor(unknown)
+        ? `an action entry has no path rules ("${unknown}")`
+        : `unknown key "${unknown}"`,
+    };
+  }
+
+  const action = typeof entry.action === "string" ? actionFor(entry.action) : null;
+  if (!action) return { error: `unknown action "${String(entry.action)}"` };
+
+  const caution = typeof entry.caution === "string" && entry.caution.trim() ? entry.caution : null;
+  const riskNote = [action.riskNote, caution].filter(Boolean).join(" ") || null;
+
+  return {
+    id: entry.id,
+    label: entry.label,
+    tool: entry.tool ?? action.tool,
+    cost: entry.cost ?? action.cost,
+    risk: action.risk === "caution" || caution ? "caution" : "safe",
+    riskNote,
+    perProject: false,
+    match: [],
+    action: action.id,
   };
 }
 

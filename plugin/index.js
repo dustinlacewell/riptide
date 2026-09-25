@@ -26,6 +26,11 @@ import { readMap } from "./map/read.js";
 import { childrenPage } from "./map/page.js";
 import { identifyFolder } from "./map/identify.js";
 import { offerPicks } from "./map/offer.js";
+import { actionFor } from "./actions/index.js";
+import { commandsOf, listActions } from "./actions/list.js";
+import { runAction } from "./actions/run.js";
+import { createSpawner } from "./actions/spawn.js";
+import { runPlan } from "./runPlan.js";
 
 const BASE = "/__riptide";
 
@@ -44,6 +49,18 @@ const PLAN_TTL_MS = 10 * 60 * 1000;
 
 /** Space-map snapshots, one per drive, held between requests. */
 const maps = createMapStore();
+
+/** How actions start processes: fixed argv, no shell. */
+const spawnCommand = createSpawner();
+
+/** What an action's detect, steps and run are given. */
+async function actionContext() {
+  const { drives } = await listRoots();
+  return { env: process.env, spawn: spawnCommand, drives };
+}
+
+/** Entries that link an action rather than name paths. */
+const isAction = (entry) => Boolean(entry.action);
 
 export default function riptide() {
   return {
@@ -125,11 +142,10 @@ async function dirsRoute(url, res) {
  */
 async function cacheConfigsRoute(res) {
   const { entries, packs, errors } = await loadPacks();
+  const ctx = await actionContext();
 
-  json(res, 200, {
-    packs,
-    errors,
-    configs: entries.map((e) => ({
+  const configs = await Promise.all(
+    entries.map(async (e) => ({
       id: e.id,
       label: e.label,
       tool: e.tool,
@@ -137,11 +153,15 @@ async function cacheConfigsRoute(res) {
       cost: e.cost,
       risk: e.risk,
       riskNote: e.riskNote,
-      // What the entry looks for, so the modal can show where it searches.
-      where: whereOf(e),
+      // What the entry looks for, so the modal can show where it searches;
+      // for an action, the commands it runs.
+      where: isAction(e) ? await commandsOf(actionFor(e.action), ctx) : whereOf(e),
       perProject: e.perProject,
+      action: e.action ?? null,
     })),
-  });
+  );
+
+  json(res, 200, { packs, errors, configs });
 }
 
 async function cachesRoute(req, res) {
@@ -157,13 +177,15 @@ async function cachesRoute(req, res) {
   // Filtering here rather than in the UI means a disabled per-project rule
   // costs no MFT work at all, which is the expensive part.
   const off = new Set(Array.isArray(disabled) ? disabled : []);
-  const entries = all.filter((e) => !off.has(e.id));
+  const enabled = all.filter((e) => !off.has(e.id));
+  const entries = enabled.filter((e) => !isAction(e));
+  const actionEntries = enabled.filter(isAction);
 
-  // A new cache scan replaces the last one's offer.
+  // A new cache scan replaces the last one's offer, paths and actions.
   offered.clear("caches");
 
-  if (entries.length === 0) {
-    return json(res, 200, { found: [], packs, errors, sized: false });
+  if (enabled.length === 0) {
+    return json(res, 200, { type: "done", found: [], packs, errors, sized: false });
   }
 
   // Streamed: reading a drive's MFT takes long enough that the UI should
@@ -174,11 +196,20 @@ async function cachesRoute(req, res) {
   });
 
   const started = Date.now();
-  const { drives } = await listRoots();
+  const ctx = await actionContext();
+  const { drives } = ctx;
   if (signal.aborted) return;
 
+  // Detected alongside the MFT read. Only an available action is offered,
+  // so only it can reach a plan.
+  const actionsListed = listActions(actionEntries, ctx).then((actions) => {
+    if (signal.aborted) return;
+    offered.addActions(actions.filter((a) => a.available).map((a) => a.action), "caches");
+    res.write(JSON.stringify({ type: "actions", actions, packs }) + "\n");
+  });
+
   try {
-    const result = await resolveEntries(entries, {
+    const result = entries.length === 0 ? { errors: [] } : await resolveEntries(entries, {
       drives,
       signal,
       // With a root, only its drive is read and only hits under it are kept.
@@ -192,6 +223,8 @@ async function cachesRoute(req, res) {
         res.write(JSON.stringify({ type: "found", found, packs }) + "\n");
       },
     });
+    await actionsListed;
+    if (signal.aborted) return;
 
     res.write(
       JSON.stringify({
@@ -203,6 +236,7 @@ async function cachesRoute(req, res) {
   } catch (err) {
     // The client stopped the run and is no longer listening.
     if (signal.aborted) return;
+    await actionsListed;
     res.write(
       // A crash here is a fault in the scan, not a malformed pack. Reporting
       // it under "pack issues" sends anyone debugging to the wrong place.
@@ -349,13 +383,18 @@ async function grepRoute(req, res) {
 }
 
 async function planRoute(req, res) {
-  const { paths, bytes } = await body(req);
+  const { paths = [], actions = [], bytes } = await body(req);
 
-  if (!Array.isArray(paths) || paths.length === 0) {
-    return json(res, 400, { error: "paths must be a non-empty array" });
+  if (!Array.isArray(paths) || !Array.isArray(actions) || paths.length + actions.length === 0) {
+    return json(res, 400, { error: "paths and actions must be arrays, not both empty" });
   }
 
-  const { allowed, refused } = buildPlan(paths, { offered, screen: screenPaths });
+  const { items, refused, refusedActions } = buildPlan(
+    { paths, actions },
+    { offered, screen: screenPaths },
+  );
+  const allowed = items.filter((i) => i.kind === "path").map((i) => i.path);
+  const actionIds = items.filter((i) => i.kind === "action").map((i) => i.id);
 
   // Confirm each path still exists, and nothing more. Totalling the bytes
   // again would re-walk every subtree — for a few hundred node_modules that
@@ -376,16 +415,32 @@ async function planRoute(req, res) {
     }),
   );
 
+  // What the confirmation shows for each action: the commands it will run.
+  const ctx = await actionContext();
+  const planActions = await Promise.all(
+    actionIds.map(async (id) => {
+      const action = actionFor(id);
+      return { id, label: action.label, risk: action.risk, commands: await commandsOf(action, ctx) };
+    }),
+  );
+
+  const planItems = [
+    ...present.map((path) => ({ kind: "path", path })),
+    ...actionIds.map((id) => ({ kind: "action", id })),
+  ];
   const token = randomUUID();
-  plans.set(token, { paths: present, expires: Date.now() + PLAN_TTL_MS });
+  plans.set(token, { items: planItems, expires: Date.now() + PLAN_TTL_MS });
   sweepPlans();
 
   json(res, 200, {
     token,
-    count: present.length,
+    // Every item, paths and actions: the number the user types.
+    count: planItems.length,
     bytes: typeof bytes === "string" ? bytes : "0",
     paths: present,
+    actions: planActions,
     refused,
+    refusedActions,
     missing,
   });
 }
@@ -401,13 +456,17 @@ async function zapRoute(req, res) {
 
   // The typed count must match the plan. A stale tab cannot delete a
   // different set than the one the user read.
-  if (confirmCount !== plan.paths.length) {
+  if (confirmCount !== plan.items.length) {
     return json(res, 400, {
-      error: `confirmation mismatch: plan has ${plan.paths.length} paths, got ${confirmCount}`,
+      error: `confirmation mismatch: plan has ${plan.items.length} items, got ${confirmCount}`,
     });
   }
 
   plans.delete(token);
+
+  // Paths finish even if the client leaves; an action still waiting does
+  // not start, and a running one is killed.
+  const signal = abortOnDisconnect(res);
 
   // Streamed, like the scan: deleting hundreds of folders takes long enough
   // that the UI needs to show movement rather than hang on one request.
@@ -415,28 +474,33 @@ async function zapRoute(req, res) {
     "Content-Type": "application/x-ndjson",
     "Cache-Control": "no-cache",
   });
+  const write = (note) => {
+    if (!res.writableEnded && !res.destroyed) res.write(JSON.stringify(note) + "\n");
+  };
 
   const started = Date.now();
-  const results = await zapPaths(plan.paths, {
+  const { deleted, failed, actions } = await runPlan(plan.items, {
     permanent: permanent === true,
-    onProgress: (note) =>
-      res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
+    signal,
+    write,
+    zapPaths,
+    runAction,
+    actionFor,
+    ctx: await actionContext(),
   });
 
-  const deleted = results.filter((r) => r.ok).map((r) => r.path);
   // Before the done line: a map that reloads on it must see the change.
   maps.removePaths(deleted);
 
-  res.write(
-    JSON.stringify({
-      type: "done",
-      permanent: permanent === true,
-      elapsedMs: Date.now() - started,
-      deleted,
-      failed: results.filter((r) => !r.ok),
-    }) + "\n",
-  );
-  res.end();
+  write({
+    type: "done",
+    permanent: permanent === true,
+    elapsedMs: Date.now() - started,
+    deleted,
+    failed,
+    actions,
+  });
+  if (!res.destroyed) res.end();
 }
 
 /**
@@ -454,9 +518,10 @@ async function mapReadRoute(req, res) {
 
   // The junk marks use the same rules as the other tabs: the enabled cache
   // entries and the Zap tab's folder names.
+  // An action names no folder, so it marks nothing.
   const { entries: all } = await loadPacks();
   const off = new Set(Array.isArray(disabled) ? disabled : []);
-  const entries = all.filter((e) => !off.has(e.id));
+  const entries = all.filter((e) => !off.has(e.id) && !isAction(e));
   const { drives } = await listRoots();
   if (signal.aborted) return;
 

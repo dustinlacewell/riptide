@@ -1,12 +1,14 @@
 /**
- * The paths the server has offered for deletion.
+ * What the server has offered: paths for deletion, and actions to run.
  *
- * The server deletes only what one of its own scans found. A client can ask
- * for any path; a path no scan offered is refused before it can reach a plan.
+ * The server deletes only what one of its own scans found, and runs only
+ * the actions its last cache scan found available. A client can ask for
+ * anything; what no scan offered is refused before it can reach a plan.
  *
- * Each scan source ("zap", "caches") owns its entries. A new scan of a source
- * clears that source's previous entries first. Entries expire after a fixed
- * time, so an old scan does not keep a path deletable forever.
+ * Each scan source ("zap", "caches", "map") owns its entries. A new scan of
+ * a source clears that source's previous entries first, paths and actions
+ * alike. Entries expire after a fixed time, so an old scan does not keep a
+ * path deletable, or an action runnable, forever.
  */
 
 import { pathKey } from "./pathKey.js";
@@ -18,28 +20,43 @@ const TTL_MS = 60 * 60 * 1000;
  * @returns {{add: (paths: string[], source: string) => void,
  *            has: (path: string) => boolean,
  *            sourcesOf: (path: string) => string[],
+ *            addActions: (ids: string[], source: string) => void,
+ *            actionSourcesOf: (id: string) => string[],
  *            clear: (source: string) => void}}
  */
 export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
-  // key -> Map<source, expiry>
+  const paths = createKeyed(pathKey, { now, ttlMs });
+  const actions = createKeyed((id) => String(id), { now, ttlMs });
+
+  return {
+    add: paths.add,
+    has: (p) => paths.sourcesOf(p).length > 0,
+    sourcesOf: paths.sourcesOf,
+    addActions: actions.add,
+    actionSourcesOf: actions.sourcesOf,
+    clear(source) {
+      paths.clear(source);
+      actions.clear(source);
+    },
+  };
+}
+
+/** One namespace of offers: key -> Map<source, expiry>. */
+function createKeyed(keyOf, { now, ttlMs }) {
   const entries = new Map();
 
-  function add(paths, source) {
+  function add(items, source) {
     const expires = now() + ttlMs;
-    for (const p of paths) {
-      const key = pathKey(p);
+    for (const item of items) {
+      const key = keyOf(item);
       if (!entries.has(key)) entries.set(key, new Map());
       entries.get(key).set(source, expires);
     }
   }
 
-  function has(p) {
-    return sourcesOf(p).length > 0;
-  }
-
-  // The sources that still offer a path. Expired entries are dropped.
-  function sourcesOf(p) {
-    const key = pathKey(p);
+  // The sources that still offer an item. Expired entries are dropped.
+  function sourcesOf(item) {
+    const key = keyOf(item);
     const sources = entries.get(key);
     if (!sources) return [];
     const t = now();
@@ -59,5 +76,5 @@ export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
     }
   }
 
-  return { add, has, sourcesOf, clear };
+  return { add, sourcesOf, clear };
 }

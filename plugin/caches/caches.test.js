@@ -258,3 +258,69 @@ test("screen: waiving depth does not unprotect system paths", () => {
   assert.equal(allowed.length, 0, "none of these may ever be deleted");
   assert.equal(refused.length, 5);
 });
+
+// --- action entries --------------------------------------------------------
+
+test("pack: an entry may link a registered action instead of paths", () => {
+  const pack = validatePack({
+    entries: [{ id: "pnpm-store", label: "pnpm store", action: "pnpm-store-prune" }],
+  });
+  assert.deepEqual(pack.errors, []);
+  const [e] = pack.entries;
+  assert.equal(e.action, "pnpm-store-prune");
+  assert.deepEqual(e.match, []);
+  assert.equal(e.risk, "safe");
+  assert.equal(e.tool, "pnpm", "tool and cost default to the action's");
+  assert.equal(typeof e.cost, "string");
+});
+
+test("pack: an unknown action, or an action with path rules, is rejected", () => {
+  const pack = validatePack({
+    entries: [
+      { id: "a", label: "A", action: "rm-rf" },
+      { id: "b", label: "B", action: "pnpm-store-prune", paths: ["~/.pnpm-store"] },
+      { id: "c", label: "C", action: "pnpm-store-prune", beside: ["package.json"] },
+      { id: "d", label: "D", action: "pnpm-store-prune", command: "pnpm store prune" },
+      { id: "e", label: "E", action: ["pnpm-store-prune"] },
+    ],
+  });
+  assert.equal(pack.entries.length, 0);
+  assert.deepEqual(
+    pack.errors.map((x) => x.reason),
+    [
+      'unknown action "rm-rf"',
+      'an action entry has no path rules ("paths")',
+      'an action entry has no path rules ("beside")',
+      'unknown key "command"',
+      'unknown action "pnpm-store-prune"',
+    ],
+  );
+});
+
+test("pack: a pack can add a caution to an action but never lift one", () => {
+  const pack = validatePack({
+    entries: [
+      { id: "w", label: "W", action: "wsl-compact", caution: "" },
+      { id: "p", label: "P", action: "pnpm-store-prune", caution: "Slow on HDDs." },
+    ],
+  });
+  const [w, p] = pack.entries;
+  assert.equal(w.risk, "caution");
+  assert.equal(w.riskNote, "Shuts down WSL and Docker while it runs.");
+  assert.equal(p.risk, "caution");
+  assert.equal(p.riskNote, "Slow on HDDs.");
+});
+
+test("pack: the shipped packs link each action once, and pnpm's store is an action", async () => {
+  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "packs");
+  const { entries } = await loadPacks(dir);
+  const linked = entries.filter((e) => e.action).map((e) => e.action).sort();
+  assert.deepEqual(linked, [
+    "docker-builder-prune",
+    "docker-image-prune",
+    "pnpm-store-prune",
+    "windows-component-cleanup",
+    "wsl-compact",
+  ]);
+  assert.equal(entries.find((e) => e.id === "pnpm-store").action, "pnpm-store-prune");
+});

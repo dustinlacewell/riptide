@@ -1,0 +1,7 @@
+{
+  "id": "wsl-disks",
+  "label": "WSL disks",
+  "tool": "wsl",
+  "action": "wsl-compact",
+  "pack": "system"
+}

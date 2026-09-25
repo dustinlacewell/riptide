@@ -1,0 +1,7 @@
+{
+  "id": "docker-dangling-images",
+  "label": "Docker dangling images",
+  "tool": "docker",
+  "action": "docker-image-prune",
+  "pack": "docker"
+}
