@@ -29,6 +29,7 @@ import { offerPicks } from "./map/offer.js";
 import { actionFor } from "./actions/index.js";
 import { commandsOf, listActions } from "./actions/list.js";
 import { bindActions } from "./actions/bind.js";
+import { createRunLock } from "./actions/lock.js";
 import { runAction } from "./actions/run.js";
 import { createSpawner } from "./actions/spawn.js";
 import { runPlan } from "./runPlan.js";
@@ -50,6 +51,9 @@ const PLAN_TTL_MS = 10 * 60 * 1000;
 
 /** Space-map snapshots, one per drive, held between requests. */
 const maps = createMapStore();
+
+/** Actions running now, across every /zap: one run of each at a time. */
+const runningActions = createRunLock();
 
 /** How actions start processes: fixed argv, no shell. */
 const spawnCommand = createSpawner();
@@ -483,6 +487,7 @@ async function zapRoute(req, res) {
     runAction,
     actionFor,
     ctx: await actionContext(),
+    lock: runningActions,
   });
 
   // Before the done line: a map that reloads on it must see the change.

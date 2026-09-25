@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 
 import { runPlan } from "./runPlan.js";
 import { bindActions } from "./actions/bind.js";
+import { createRunLock } from "./actions/lock.js";
 import { listActions } from "./actions/list.js";
 import { runAction } from "./actions/run.js";
 import { createFakeSpawn } from "./actions/fakeSpawn.js";
@@ -55,6 +56,7 @@ test("runPlan: paths first, then actions in order, with their output", async () 
       runAction,
       actionFor: (id) => registry[id] ?? null,
       ctx: { spawn: fake.spawn },
+      lock: createRunLock(),
     },
   );
 
@@ -98,6 +100,7 @@ test("runPlan: a failed action does not stop the next; an unknown id fails", asy
       runAction,
       actionFor: (id) => registry[id] ?? null,
       ctx: { spawn: fake.spawn },
+      lock: createRunLock(),
     },
   );
   assert.deepEqual(zapCalls, [], "no paths, no delete call");
@@ -125,6 +128,7 @@ test("runPlan: a disconnect kills the running action and starts no more", async 
       runAction,
       actionFor: (id) => registry[id],
       ctx: { spawn: fake.spawn },
+      lock: createRunLock(),
     },
   );
   setTimeout(() => controller.abort(), 10);
@@ -159,9 +163,57 @@ test("plan binds steps: steps() changing after the plan has no effect on the run
     runAction,
     actionFor,
     ctx: { spawn: fake.spawn },
+    lock: createRunLock(),
   });
   assert.deepEqual(result.actions, [{ id: "shifty", ok: true }]);
   assert.deepEqual(fake.calls.map((c) => [c.exe, ...c.args]), [["C:\\tool.exe", "C:\\one.vhdx"]]);
+});
+
+test("run lock: a second run of an action already running fails that item only", async () => {
+  let release;
+  const fake = createFakeSpawn(() => ({ hang: true }));
+  const spawn = (exe, args) => {
+    const child = fake.spawn(exe, args);
+    if (exe === "C:\\slow.exe") release = () => child.emit("close", 0);
+    return child;
+  };
+  const registry = {
+    slow: fakeAction("slow", [{ exe: "C:\\slow.exe", args: [], timeoutMs: 60_000, critical: true }]),
+    quick: fakeAction("quick", [{ exe: "C:\\quick.exe", args: [], timeoutMs: 1000 }]),
+  };
+  const lock = createRunLock();
+  const deps = (notes) => ({
+    permanent: false,
+    write: (n) => notes.push(n),
+    zapPaths: stubZap([]),
+    runAction,
+    actionFor: (id) => registry[id] ?? null,
+    ctx: { spawn },
+    lock,
+  });
+
+  const firstNotes = [];
+  const first = runPlan([bound(registry, "slow")], deps(firstNotes));
+  await new Promise((r) => setTimeout(r, 5));
+
+  // quick never hangs in this run's spawner.
+  const quickSpawn = createFakeSpawn();
+  const second = await runPlan([bound(registry, "slow"), bound(registry, "quick")], {
+    ...deps([]),
+    ctx: { spawn: quickSpawn.spawn },
+  });
+  assert.deepEqual(second.actions, [
+    { id: "slow", ok: false, error: "already running" },
+    { id: "quick", ok: true },
+  ]);
+  assert.deepEqual(quickSpawn.calls.map((c) => c.exe), ["C:\\quick.exe"]);
+
+  release();
+  assert.deepEqual((await first).actions, [{ id: "slow", ok: true }]);
+
+  // Released once done: the next run may take it.
+  const third = await runPlan([bound(registry, "slow")], { ...deps([]), ctx: { spawn: createFakeSpawn().spawn } });
+  assert.deepEqual(third.actions, [{ id: "slow", ok: true }]);
 });
 
 test("bindActions: an action whose steps() throws or is empty is refused", async () => {

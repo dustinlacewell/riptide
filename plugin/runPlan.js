@@ -25,7 +25,10 @@
  *               {kind: "action", id: string, steps: object[]}>} items
  * @param {{permanent: boolean, signal?: AbortSignal, write: (note: object) => void,
  *          zapPaths: Function, runAction: Function,
- *          actionFor: (id: string) => object|null, ctx: object}} deps
+ *          actionFor: (id: string) => object|null, ctx: object,
+ *          lock: ReturnType<import("./actions/lock.js").createRunLock>}} deps
+ *   lock is shared by every run: an action already running in another
+ *   run fails here with "already running"
  * @returns {Promise<{deleted: string[], failed: object[],
  *                    actions: Array<{id: string, ok: boolean, error?: string}>}>}
  */
@@ -51,14 +54,30 @@ function deletePaths(paths, { permanent, write, zapPaths }) {
   });
 }
 
-async function runOne({ id, steps }, { signal, write, runAction, actionFor, ctx }) {
-  const action = actionFor(id);
-  const problem = !action ? "unknown action" : !Array.isArray(steps) ? "no steps bound" : null;
+async function runOne(item, deps) {
+  const { id } = item;
+  const problem = problemOf(item, deps);
   if (problem) {
-    write({ type: "action", id, status: "failed", error: problem });
+    deps.write({ type: "action", id, status: "failed", error: problem });
     return { id, ok: false, error: problem };
   }
+  try {
+    return await runLocked(item, deps);
+  } finally {
+    deps.lock.release(id);
+  }
+}
 
+/** Why an item cannot start; taking the lock when it can. */
+function problemOf({ id, steps }, { actionFor, lock }) {
+  if (!actionFor(id)) return "unknown action";
+  if (!Array.isArray(steps)) return "no steps bound";
+  if (!lock.take(id)) return "already running";
+  return null;
+}
+
+async function runLocked({ id, steps }, { signal, write, runAction, actionFor, ctx }) {
+  const action = actionFor(id);
   write({ type: "action", id, status: "running" });
   const planned = { id, steps: async () => steps, preflight: action.preflight };
   const result = await runAction(planned, ctx, {
