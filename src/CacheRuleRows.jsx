@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { bytes } from "./format.js";
 import { riskOf } from "./risk.js";
+import { IN_USE_TEXT, projectNote } from "./stale.js";
+import CacheWhere from "./CacheWhere.jsx";
 import RiskBadge from "./RiskBadge.jsx";
 import { fateClass } from "./deleteTally.js";
 import RowError from "./RowError.jsx";
@@ -20,6 +22,7 @@ import { cls } from "./ui/cls.js";
  */
 export default function CacheRuleRows({
   rule,
+  now,
   enterDelay = 0,
   refused,
   fateOf = () => null,
@@ -44,6 +47,9 @@ export default function CacheRuleRows({
   // A one-instance rule is just a row: show where it is rather than the
   // count "1", and give it no caret to open.
   const lone = rule.count === 1 ? rule.paths[0] : null;
+  // A lone instance in a project being worked on says so in place of the
+  // rule's cost: deleting it only means the next build rebuilds it.
+  const inUse = lone !== null && projectNote(lone.project, now)?.inUse === true;
 
   // A delete run: a lone rule is its one path; a group reports how many of
   // its instances failed, and each instance row says why.
@@ -90,13 +96,11 @@ export default function CacheRuleRows({
         <td>
           <span className="cache-label">{rule.label}</span>
           <span className={risk === "refused" ? "cache-cost never" : "cache-cost"}>
-            {risk === "refused" ? "Never deleted" : rule.cost}
+            {risk === "refused" ? "Never deleted" : inUse ? IN_USE_TEXT : rule.cost}
           </span>
         </td>
         {lone ? (
-          <td className="path" title={lone.path}>
-            {lone.path}
-          </td>
+          <CacheWhere path={lone.path} project={lone.project} now={now} withInUse={false} />
         ) : (
           <td className="rule-count">
             {rule.count.toLocaleString()} locations
@@ -118,6 +122,7 @@ export default function CacheRuleRows({
           <MemberRow
             key={cache.path}
             cache={cache}
+            now={now}
             risk={riskOf(cache, refused)}
             spared={spared.has(cache.path)}
             fate={fateOf(cache.path)}
@@ -130,7 +135,7 @@ export default function CacheRuleRows({
   );
 }
 
-function MemberRow({ cache, risk, spared, fate, setChecked, onPointerDown, onPointerEnter }) {
+function MemberRow({ cache, now, risk, spared, fate, setChecked, onPointerDown, onPointerEnter }) {
   const refused = risk === "refused";
   const paint = refused
     ? {}
@@ -154,9 +159,7 @@ function MemberRow({ cache, risk, spared, fate, setChecked, onPointerDown, onPoi
         {refused && <span className="never">Never deleted</span>}
         {fate?.error !== undefined && <RowError error={fate.error} />}
       </td>
-      <td className="path" colSpan={2} title={cache.path}>
-        {cache.path}
-      </td>
+      <CacheWhere path={cache.path} project={cache.project} now={now} colSpan={2} />
       <td className="num">{bytes(cache.bytes)}</td>
       <td className="num">{cache.files.toLocaleString()}</td>
     </tr>

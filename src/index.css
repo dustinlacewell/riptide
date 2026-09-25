@@ -761,7 +761,26 @@ button.primary:disabled {
 
 .bulk {
   display: flex;
+  align-items: center;
   gap: var(--s-2);
+}
+
+/* The Untouched filter: a toggle chip and its threshold. */
+.untouched {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+.untouched .pack-chip {
+  background: none;
+  cursor: pointer;
+}
+
+.untouched .pack-chip[aria-pressed="true"] {
+  border-color: var(--current);
+  color: var(--text);
 }
 
 /* --- results and reclaim ------------------------------------------------- */
@@ -1094,8 +1113,30 @@ button.twist:hover .caret {
   background: var(--raised);
 }
 
-.hits tr.member .path {
+.hits tr.member .where {
   padding-left: 22px;
+}
+
+/* A cache's path, then how long its project has gone untouched. The path
+   gives way first; the note never wraps. */
+.where-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.where-line .path {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.project-age {
+  flex: none;
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  white-space: nowrap;
 }
 
 /* Close the block of instances off from the next rule. */

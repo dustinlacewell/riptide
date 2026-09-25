@@ -21,6 +21,8 @@ import { useZapFlow } from "./useZapFlow.js";
 import { useRowPainter } from "./useRowPainter.js";
 import { CACHE_GROUP_COLUMNS, DEFAULT_SORT, nextSort } from "./sort.js";
 import { groupHits, sortGroups } from "./group.js";
+import { DEFAULT_UNTOUCHED, untouchedFor } from "./stale.js";
+import UntouchedFilter from "./UntouchedFilter.jsx";
 
 const NOUN = ["location", "locations"];
 
@@ -62,6 +64,8 @@ export default function CachePanel({
   // Which rules are showing their instances. Local and deliberately not
   // persisted: a new scan starts collapsed.
   const [opened, setOpened] = useState(() => new Set());
+  const [scannedAt, setScannedAt] = useState(0);
+  const [untouched, setUntouched] = useState({ on: false, days: DEFAULT_UNTOUCHED });
 
   const toggleOpen = useCallback((id) => {
     setOpened((prev) => {
@@ -92,6 +96,8 @@ export default function CachePanel({
     telemetry.start();
 
     setArrived([]);
+    // Project ages are read against the scan, not against each render.
+    setScannedAt(Date.now());
 
     try {
       const done = await api.caches({ disabled, root }, (note) => {
@@ -130,16 +136,24 @@ export default function CachePanel({
     }
   }, [flow, run, telemetry, disabled, root]);
 
+  // The Untouched filter narrows everything below it — table, bulk buttons,
+  // summary and zap plan — so a hidden row can never be deleted unseen.
+  const found = useMemo(
+    () => (untouched.on ? untouchedFor(arrived, untouched.days, scannedAt) : arrived),
+    [arrived, untouched, scannedAt],
+  );
+
   // Grouping and sorting happen at render, not on arrival, so re-sorting
   // never has to wait for another scan.
   const rules = useMemo(
-    () => sortGroups(groupHits(arrived), sort),
-    [arrived, sort],
+    () => sortGroups(groupHits(found), sort),
+    [found, sort],
   );
 
-  // The flat list stays the source of truth for the summary, the bulk
-  // buttons and the zap plan; only the table is grouped.
-  const found = arrived;
+  const toggleUntouched = useCallback(() => {
+    setUntouched((u) => ({ ...u, on: !u.on }));
+    setSort(DEFAULT_SORT);
+  }, []);
 
   // A refused path never goes into a plan, whatever its checkbox said.
   const selected = useMemo(
@@ -251,47 +265,60 @@ export default function CachePanel({
 
       <DeleteRun run={flow.run} noun={NOUN} />
 
-      {found.length > 0 && (
+      {arrived.length > 0 && (
         <div className="results">
           <div className="results-main">
             <div className="bulk">
-              <button onClick={() => setSpared(new Set())}>Select all</button>
-              <button onClick={() => setSpared(new Set(found.map((c) => c.path)))}>
+              <button onClick={() => setChecked(found.map((c) => c.path), true)}>Select all</button>
+              <button onClick={() => setChecked(found.map((c) => c.path), false)}>
                 Select none
               </button>
+              <UntouchedFilter
+                on={untouched.on}
+                days={untouched.days}
+                onToggle={toggleUntouched}
+                onDays={(days) => setUntouched((u) => ({ ...u, days }))}
+              />
             </div>
 
-            <table className={`hits caches${painting ? " painting" : ""}`}>
-              <thead>
-                <tr>
-                  <th />
-                  <th />
-                  <th className="plain">Risk</th>
-                  <SortHeader
-                    columns={CACHE_GROUP_COLUMNS}
-                    sort={sort}
-                    onSort={(key) => setSort((s) => nextSort(s, key))}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((rule, i) => (
-                  <CacheRuleRows
-                    key={rule.id}
-                    rule={rule}
-                    enterDelay={enterDelay(i)}
-                    refused={flow.refused}
-                    fateOf={(path) => fateOf(flow.run, path)}
-                    open={opened.has(rule.id)}
-                    onToggle={toggleOpen}
-                    spared={spared}
-                    setChecked={setChecked}
-                    onPointerDown={onPointerDown}
-                    onPointerEnter={onPointerEnter}
-                  />
-                ))}
-              </tbody>
-            </table>
+            {found.length === 0 && (
+              <p className="empty">No project untouched for {untouched.days} days.</p>
+            )}
+
+            {found.length > 0 && (
+              <table className={`hits caches${painting ? " painting" : ""}`}>
+                <thead>
+                  <tr>
+                    <th />
+                    <th />
+                    <th className="plain">Risk</th>
+                    <SortHeader
+                      columns={CACHE_GROUP_COLUMNS}
+                      sort={sort}
+                      onSort={(key) => setSort((s) => nextSort(s, key))}
+                    />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.map((rule, i) => (
+                    <CacheRuleRows
+                      key={rule.id}
+                      rule={rule}
+                      now={scannedAt}
+                      enterDelay={enterDelay(i)}
+                      refused={flow.refused}
+                      fateOf={(path) => fateOf(flow.run, path)}
+                      open={opened.has(rule.id)}
+                      onToggle={toggleOpen}
+                      spared={spared}
+                      setChecked={setChecked}
+                      onPointerDown={onPointerDown}
+                      onPointerEnter={onPointerEnter}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <ReclaimPanel
@@ -318,7 +345,7 @@ export default function CachePanel({
         </div>
       )}
 
-      {summary && found.length === 0 && (
+      {summary && arrived.length === 0 && (
         <p className="empty">No known caches found on this machine.</p>
       )}
 
