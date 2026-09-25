@@ -17,7 +17,7 @@ import { addRecord, createTree } from "./fold.js";
 import { LAG_MS, applyChanges, changedRecords, staleReason, unflushedRecords } from "./apply.js";
 import { buildRecord } from "./fakeVolume.js";
 import { dumpTree } from "./treeDump.js";
-import { createWorld } from "./world.js";
+import { createWorld, random } from "./world.js";
 
 const RECORDS = 64;
 const QUERY = buildNameQuery(["cargo.toml", "package.json", "*.csproj"]);
@@ -27,9 +27,15 @@ function entryOf(spec, n) {
 }
 
 function fold(specs) {
+  return foldWith((n) => specs.get(n));
+}
+
+/** Fold record n as specOf(n) has it, for every record number. */
+function foldWith(specOf) {
   const tree = createTree({ size: RECORDS, query: QUERY });
-  for (const [n, spec] of [...specs].sort((a, b) => a[0] - b[0])) {
-    const entry = entryOf(spec, n);
+  for (let n = 0; n < RECORDS; n++) {
+    const spec = specOf(n);
+    const entry = spec ? entryOf(spec, n) : null;
     if (entry) addRecord(tree, n, entry);
   }
   return tree;
@@ -64,6 +70,43 @@ test("apply: a run of random changes lands where a fresh fold does", () => {
     assert.deepEqual(dumpTree(tree, RECORDS), want, `seed ${seed}`);
   }
   assert.ok(moved >= 70, `most runs change the tree (${moved} of 80)`);
+});
+
+test("apply: order, a full read taken over time, and a late partial update all converge", () => {
+  for (let seed = 1; seed <= 300; seed++) {
+    const world = createWorld(seed, { records: RECORDS, first: 20 });
+    const rnd = random(seed * 7);
+    for (let i = 0; i < 25; i++) world.step();
+    const steps = 5 + (seed % 60);
+    const snaps = [new Map(world.specs)];
+    const changes = [];
+    for (let i = 0; i < steps; i++) {
+      changes.push(...world.step());
+      snaps.push(new Map(world.specs));
+    }
+    const want = dumpTree(fold(world.specs), RECORDS);
+    const { numbers } = changedRecords(changes, { now: world.now() + LAG_MS });
+    const entries = reread(world.specs, numbers);
+
+    // A full read streams for a while: record n is seen at a later state
+    // the higher n is.
+    const mixed = foldWith((n) => snaps[Math.floor((n / RECORDS) * snaps.length)].get(n));
+    applyChanges(mixed, numbers, entries);
+    assert.deepEqual(dumpTree(mixed, RECORDS), want, `mixed, seed ${seed}`);
+
+    const shuffled = fold(snaps[0]);
+    applyChanges(shuffled, [...numbers].sort(() => rnd() - 0.5), entries);
+    assert.deepEqual(dumpTree(shuffled, RECORDS), want, `shuffled, seed ${seed}`);
+
+    // Half the changes first, read at a middle state, then all of them.
+    const split = fold(snaps[0]);
+    const half = changedRecords(changes.slice(0, Math.floor(changes.length / 2)), {
+      now: world.now() + LAG_MS,
+    }).numbers;
+    applyChanges(split, half, reread(snaps[Math.floor(steps / 2)], half));
+    applyChanges(split, numbers, entries);
+    assert.deepEqual(dumpTree(split, RECORDS), want, `split, seed ${seed}`);
+  }
 });
 
 test("apply: applying the same changes again changes nothing", () => {
