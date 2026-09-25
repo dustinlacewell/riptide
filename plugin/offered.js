@@ -27,6 +27,9 @@ const TTL_MS = 60 * 60 * 1000;
 export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
   const paths = createKeyed(pathKey, { now, ttlMs });
   const actions = createKeyed((id) => String(id), { now, ttlMs });
+  // source -> pathKey -> the markers the path's rule needed next to it or
+  // inside it (caches/verify.js), checked on disk again at plan time
+  const markers = new Map();
 
   return {
     add: paths.add,
@@ -34,9 +37,28 @@ export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
     sourcesOf: paths.sourcesOf,
     addActions: actions.add,
     actionSourcesOf: actions.sourcesOf,
+
+    /**
+     * @param {string} path an offered path
+     * @param {object[]} needs from markersOf in caches/verify.js
+     * @param {string} source
+     */
+    addMarkers(path, needs, source) {
+      if (needs.length === 0) return;
+      if (!markers.has(source)) markers.set(source, new Map());
+      markers.get(source).set(pathKey(path), needs);
+    },
+
+    /** Every marker any live source recorded for a path. */
+    markersOf(path) {
+      const live = paths.sourcesOf(path);
+      return live.flatMap((source) => markers.get(source)?.get(pathKey(path)) ?? []);
+    },
+
     clear(source) {
       paths.clear(source);
       actions.clear(source);
+      markers.delete(source);
     },
   };
 }

@@ -15,6 +15,7 @@ import { listDirs } from "./dirs.js";
 import { loadPacks } from "./caches/load.js";
 import { resolveEntries } from "./caches/resolve.js";
 import { whereOf } from "./caches/pack.js";
+import { markersOf, verifyMarkers } from "./caches/verify.js";
 import { screenPaths, zapPaths } from "./zap.js";
 import { createOffered } from "./offered.js";
 import { buildPlan } from "./plan.js";
@@ -219,6 +220,7 @@ async function cachesRoute(req, res) {
   const enabled = all.filter((e) => !off.has(e.id));
   const entries = enabled.filter((e) => !isAction(e));
   const actionEntries = enabled.filter(isAction);
+  const byId = new Map(entries.map((e) => [e.id, e]));
 
   // A new cache scan replaces the last one's offer, paths and actions.
   offered.clear("caches");
@@ -260,6 +262,11 @@ async function cachesRoute(req, res) {
       // before its size is known — an unsized row is not actionable.
       onFound: (found) => {
         offered.add(found.map((hit) => hit.path), "caches");
+        // What each hit's rule saw beside or inside it, checked again at /plan.
+        for (const hit of found) {
+          const entry = byId.get(hit.id);
+          if (entry) offered.addMarkers(hit.path, markersOf(entry), "caches");
+        }
         res.write(JSON.stringify({ type: "found", found, packs }) + "\n");
       },
     });
@@ -435,7 +442,13 @@ async function planRoute(req, res) {
     { paths, actions },
     { offered, screen: screenPaths },
   );
-  const allowed = items.filter((i) => i.kind === "path").map((i) => i.path);
+  // A cache hit found by what sat beside or inside it must still have it.
+  const verified = await verifyMarkers(
+    items.filter((i) => i.kind === "path").map((i) => i.path),
+    { markersOf: offered.markersOf },
+  );
+  refused.push(...verified.refused);
+  const allowed = verified.kept;
   const actionIds = items.filter((i) => i.kind === "action").map((i) => i.id);
 
   // Confirm each path still exists, and nothing more. Totalling the bytes
