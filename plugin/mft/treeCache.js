@@ -12,7 +12,8 @@
  * A full read happens when nothing is kept, when the kept tree lacks a
  * file pattern the caller needs, when the caller asks for one, and when
  * the journal cannot vouch for the gap (apply.js staleReason, or more than
- * MAX_CHANGES records changed).
+ * MAX_CHANGES records changed). The NTFS log's LSN (logfile.js) is the
+ * witness for writes the journal never saw: another OS's driver.
  *
  * After a full read the tree's journal position is set to a USN from just
  * before the read began, so the next update replays whatever changed while
@@ -31,7 +32,15 @@ import { createKeep, keyOf } from "../keep.js";
 import { parseBootSector } from "./boot.js";
 import { queryIds } from "./filenames.js";
 import { driveBytes } from "./footprint.js";
-import { MAX_CHANGES, applyChanges, changedRecords, staleReason, unflushedRecords } from "./apply.js";
+import {
+  MAX_CHANGES,
+  applyChanges,
+  changedRecords,
+  foreignWriteReason,
+  staleReason,
+  unflushedRecords,
+} from "./apply.js";
+import { readLogLsn } from "./logfile.js";
 import { findUsnAt, readChanges, readJournalInfo } from "./journal.js";
 import { readEntries } from "./reread.js";
 import { readMftRuns, readTreeFrom } from "./scan.js";
@@ -142,6 +151,7 @@ export function createTreeCache({
     kept.recordsTotal = Math.max(kept.recordsTotal ?? 0, plan.recordsTotal);
     // Up to an unflushed page, if one stopped the read; it is read next time.
     kept.journal = { id: plan.info.id, nextUsn: plan.end };
+    kept.lsn = plan.lsn;
     kept.recent = plan.recent;
     kept.version = (kept.version ?? 0) + 1;
     keep.touch(key);
@@ -156,11 +166,14 @@ export function createTreeCache({
   async function planUpdate({ read }, kept, signal) {
     const boot = parseBootSector(await read(0n, 512));
     const mftRuns = await readMftRuns(read, boot);
+    const lsn = await readLogLsn({ read, boot, mftRuns, signal });
     const info = await readJournalInfo({ read, boot, mftRuns, record: kept.journalRecord, signal });
-    const reason = staleReason(kept, { serial: boot.serial, info });
+    const reason = staleReason(kept, { serial: boot.serial, info, lsn });
     if (reason) return { reason };
 
     const { changes, end } = await readChanges({ read, boot, info, from: kept.journal.nextUsn, signal });
+    const foreign = foreignWriteReason(kept, { lsn, changes: changes.length });
+    if (foreign) return { reason: foreign };
     const { numbers, recent } = changedRecords(changes, { recent: kept.recent, now: wallClock() });
     if (numbers.size > MAX_CHANGES) return { reason: `more than ${MAX_CHANGES.toLocaleString()} records changed` };
 
@@ -169,7 +182,7 @@ export function createTreeCache({
     // A torn record, or one older on disk than its journal entry, is read
     // again next time rather than trusted now.
     const again = new Set([...recent, ...torn, ...unflushedRecords(changes, entries)]);
-    return { reason: null, info, end, mftRuns, numbers, entries, recent: [...again], recordsTotal };
+    return { reason: null, info, end, lsn, mftRuns, numbers, entries, recent: [...again], recordsTotal };
   }
 
   async function readFull(key, { query = null, signal, onProgress, countMatch } = {}) {
@@ -180,6 +193,7 @@ export function createTreeCache({
       const tree = await readTreeFrom(volume, key, { query, signal, onProgress, countMatch, clock });
       tree.queryIds = queryIds(query);
       tree.journal = await journalStart(volume, tree, began - REPLAY_MARGIN_MS);
+      tree.lsn = await readLogLsn({ read: volume.read, boot: tree.boot, mftRuns: tree.mftRuns, signal });
       tree.recent = [];
       tree.version = 0;
       lastBytes = driveBytes(tree);

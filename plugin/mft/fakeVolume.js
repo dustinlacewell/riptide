@@ -335,6 +335,49 @@ export function installJournal(
   return { nextUsn: laid.end, usns: laid.usns };
 }
 
+/**
+ * Give a volume a $LogFile (record 2) whose two restart pages say
+ * `lsn`, or hold 0xFF as ntfs-3g leaves a log it reset.
+ *
+ * @param {ReturnType<typeof buildVolume>} volume
+ * @param {{lsn: bigint|null, lcn?: number}} spec lsn null wipes the pages
+ */
+export function installLogFile(volume, { lsn, lcn = 200 }) {
+  volume.write(2, {
+    name: "$LogFile",
+    parent: 5,
+    noData: true,
+    attrs: [nonResident(ATTR_DATA, { runs: [{ lcn, length: 2 }], dataSize: 2 * CLUSTER })],
+  });
+  for (const page of [0, 1]) {
+    const at = (lcn + page) * CLUSTER;
+    if (lsn === null) volume.buf.fill(0xff, at, at + CLUSTER);
+    else restartPage(lsn - BigInt(page)).copy(volume.buf, at);
+  }
+}
+
+// A restart page with its fix-up array applied the way NTFS writes it.
+function restartPage(lsn) {
+  const page = Buffer.alloc(CLUSTER);
+  const sectors = CLUSTER / SECTOR;
+  page.write("RSTR", 0, "latin1");
+  page.writeUInt16LE(0x1e, 0x04);
+  page.writeUInt16LE(sectors + 1, 0x06);
+  page.writeUInt32LE(CLUSTER, 0x10);
+  page.writeUInt32LE(CLUSTER, 0x14);
+  page.writeUInt16LE(0x30, 0x18);
+  page.writeInt16LE(1, 0x1c);
+  page.writeBigInt64LE(lsn, 0x30);
+  const signature = 0x0007;
+  page.writeUInt16LE(signature, 0x1e);
+  for (let i = 1; i <= sectors; i++) {
+    const end = i * SECTOR - 2;
+    page.writeUInt16LE(page.readUInt16LE(end), 0x1e + i * 2);
+    page.writeUInt16LE(signature, end);
+  }
+  return page;
+}
+
 function listEntry({ type, name = "", record, lowestVcn = 0, seq = 1 }) {
   const nameBytes = Buffer.from(name, "utf16le");
   const length = align8(0x1a + nameBytes.length);

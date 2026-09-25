@@ -116,17 +116,42 @@ export function applyChanges(tree, numbers, entries) {
 /**
  * Why the journal cannot bring a kept tree up to date, or null when it can.
  *
- * @param {{journal: {id: bigint, nextUsn: number}|null, boot: {serial: bigint}}} held
+ * @param {{journal: {id: bigint, nextUsn: number}|null, boot: {serial: bigint},
+ *          lsn?: bigint|null}} held lsn is the NTFS log's current LSN when
+ *          the tree was last brought up to date (logfile.js)
  * @param {{serial: bigint, info: {id: bigint, lowestValidUsn: number,
- *          nextUsn: number}|null}} now
+ *          nextUsn: number}|null, lsn?: bigint|null}} now
  * @returns {string|null}
  */
-export function staleReason(held, { serial, info }) {
+export function staleReason(held, { serial, info, lsn = null }) {
   if (held.boot.serial !== serial) return "the volume changed";
+  if (typeof held.lsn === "bigint") {
+    if (lsn === null) return "the NTFS log was reset";
+    if (lsn < held.lsn) return "the NTFS log went backwards";
+  }
   if (!held.journal) return "the drive had no change journal";
   if (!info) return "the change journal is gone";
   if (info.id !== held.journal.id) return "the change journal was replaced";
   if (held.journal.nextUsn < info.lowestValidUsn) return "the change journal wrapped past the last read";
   if (held.journal.nextUsn > info.nextUsn) return "the change journal went backwards";
+  return null;
+}
+
+/**
+ * The log moved but the journal recorded nothing: the volume was written
+ * by something that keeps no journal (another OS's NTFS driver).
+ *
+ * This can also fire once when Windows checkpoints the log after changes
+ * the last update already read. That costs one needless full read; a
+ * missed foreign write would cost a wrong tree.
+ *
+ * @param {{lsn?: bigint|null}} held
+ * @param {{lsn: bigint|null, changes: number}} now changes counts journal
+ *        records read this time
+ * @returns {string|null}
+ */
+export function foreignWriteReason(held, { lsn, changes }) {
+  if (typeof held.lsn !== "bigint" || lsn === null) return null;
+  if (lsn !== held.lsn && changes === 0) return "the volume changed with no journal records";
   return null;
 }
