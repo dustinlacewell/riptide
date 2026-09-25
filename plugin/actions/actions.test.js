@@ -15,7 +15,7 @@ import { createFakeSpawn } from "./fakeSpawn.js";
 import pnpmStorePrune from "./pnpm-store-prune.js";
 import dockerBuilderPrune from "./docker-builder-prune.js";
 import dockerImagePrune from "./docker-image-prune.js";
-import wslCompact, { compactScript, findDisks, isSafeDiskPath } from "./wsl-compact.js";
+import wslCompact, { compactScript, diskPathProblem, findDisks, isSafeDiskPath } from "./wsl-compact.js";
 import windowsComponentCleanup from "./windows-component-cleanup.js";
 import { parseDockerSize } from "./docker.js";
 
@@ -183,9 +183,9 @@ test("wsl: finds distro and Docker disks, nothing else", async (t) => {
   assert.deepEqual((await findDisks(env)).sort(), [distro, docker].sort());
 });
 
-test("wsl: shutdown first, then one diskpart script per disk", async (t) => {
-  const { root, env, distro, docker, sys } = await wslMachine(t);
-  const ctx = { env, spawn: createFakeSpawn().spawn, tmpdir: root };
+test("wsl: shutdown first, then diskpart per disk, commands on stdin", async (t) => {
+  const { env, distro, docker, sys } = await wslMachine(t);
+  const ctx = { env, spawn: createFakeSpawn().spawn };
 
   assert.deepEqual(await wslCompact.detect(ctx), { available: true, bytes: null });
 
@@ -197,24 +197,38 @@ test("wsl: shutdown first, then one diskpart script per disk", async (t) => {
   const disks = [];
   for (const step of compacts) {
     assert.equal(step.exe, path.join(sys, "System32", "diskpart.exe"));
-    assert.deepEqual(step.args, ["/s", step.writes.path]);
-    assert.equal(path.dirname(step.writes.path), root);
-    assert.match(path.basename(step.writes.path), /^riptide-compact-[0-9a-f-]{36}\.txt$/);
-    const disk = /select vdisk file="([^"]+)"/.exec(step.writes.text)[1];
+    assert.deepEqual(step.args, [], "no script file argument");
+    assert.equal(step.writes, undefined);
+    const disk = /select vdisk file="([^"]+)"/.exec(step.stdin)[1];
     disks.push(disk);
-    assert.equal(step.writes.text, compactScript(disk));
+    assert.equal(step.stdin, compactScript(disk));
+    assert.ok(step.failPattern.test("Virtual Disk Service error:"));
   }
   assert.deepEqual(disks.sort(), [distro, docker].sort());
 });
 
-test("wsl: the script is exactly the four diskpart commands", () => {
+test("wsl: the stdin script is exactly the diskpart commands", () => {
   assert.equal(
     compactScript("C:\\Users\\me\\AppData\\Local\\Docker\\wsl\\disk\\docker_data.vhdx"),
     'select vdisk file="C:\\Users\\me\\AppData\\Local\\Docker\\wsl\\disk\\docker_data.vhdx"\r\n' +
       "attach vdisk readonly\r\n" +
       "compact vdisk\r\n" +
-      "detach vdisk\r\n",
+      "detach vdisk\r\n" +
+      "exit\r\n",
   );
+});
+
+test("wsl: non-ASCII disk paths are refused, which covers U+0085, U+2028 and curly quotes", () => {
+  for (const p of [
+    "C:\\Users\\zoë\\ext4.vhdx",
+    "C:\\a\\x\u0085.vhdx",
+    "C:\\a\\x\u2028.vhdx",
+    "C:\\a\\x\u201d.vhdx",
+    "C:\\a\\x\u201c.vhdx",
+  ]) {
+    assert.equal(diskPathProblem(p), "path has non-ASCII characters", JSON.stringify(p));
+    assert.throws(() => compactScript(p), /non-ASCII/);
+  }
 });
 
 test("wsl: disk paths with quotes, line breaks, no drive or no .vhdx are refused", () => {

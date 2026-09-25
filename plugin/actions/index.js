@@ -10,9 +10,9 @@
  *
  *   { id, label, tool, risk: "safe"|"caution", riskNote?, cost,
  *     detect(ctx) -> Promise<{available, reason?, bytes: string|null}>,
- *     steps(ctx)  -> Promise<[{exe, args, timeoutMs, label?, writes?}]> }
+ *     steps(ctx)  -> Promise<[step]> }   step shape: see run.js
  *
- *   ctx: {env, spawn, drives, tmpdir?}. detect may run read-only probes through ctx.spawn
+ *   ctx: {env, spawn, drives}. detect may run read-only probes through ctx.spawn
  *   and stat known paths. bytes is a decimal string, or null when the
  *   command's gain cannot be known beforehand.
  */

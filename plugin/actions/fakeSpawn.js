@@ -7,7 +7,8 @@
  *   {hang: true}   write, then wait until killed
  *   {error: Error} fail to start, as a missing program does
  *
- * Each call is recorded in `calls`, with `killed` set when it is killed.
+ * Each call is recorded in `calls`, with `killed` set when it is killed and
+ * `stdin` holding what was written to it.
  */
 
 import { EventEmitter } from "node:events";
@@ -17,12 +18,16 @@ export function createFakeSpawn(respond = () => ({ code: 0 })) {
 
   function spawn(exe, args) {
     const plan = respond(exe, args) ?? { code: 0 };
-    const call = { exe, args: [...args], killed: false };
+    const call = { exe, args: [...args], killed: false, stdin: "" };
     calls.push(call);
 
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
+    child.stdin = new EventEmitter();
+    child.stdin.end = (text = "") => {
+      call.stdin += text;
+    };
     let closed = false;
     const close = (code) => {
       if (closed) return;

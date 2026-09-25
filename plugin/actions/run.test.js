@@ -6,10 +6,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-
 import { capture, commandText, createLineSplitter, runAction, runStep } from "./run.js";
 import { createSpawner, findExe, onPath } from "./spawn.js";
 import { createFakeSpawn } from "./fakeSpawn.js";
@@ -127,39 +123,29 @@ test("run: an already-aborted signal spawns nothing", async () => {
   assert.equal(fake.calls.length, 0);
 });
 
-test("run: a step's script file exists during the spawn and is gone after", async (t) => {
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "riptide-run-"));
-  t.after(() => fsp.rm(dir, { recursive: true, force: true }));
-  const script = path.join(dir, "s.txt");
-
-  let seen = null;
-  const fake = createFakeSpawn(() => ({ code: 0 }));
-  const spawn = (exe, args) => {
-    seen = fsp.readFile(script, "utf8");
-    return fake.spawn(exe, args);
-  };
-  const result = await runStep(
-    { exe: "C:\\a.exe", args: ["/s", script], timeoutMs: 1000, writes: { path: script, text: "hello" } },
-    { spawn },
-  );
-  assert.equal(result.ok, true);
-  assert.equal(await seen, "hello");
-  await assert.rejects(fsp.stat(script));
-});
-
-test("run: a script file that already exists is not overwritten", async (t) => {
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "riptide-run-"));
-  t.after(() => fsp.rm(dir, { recursive: true, force: true }));
-  const script = path.join(dir, "s.txt");
-  await fsp.writeFile(script, "theirs");
-
+test("run: a step's stdin is written to the child and nothing else", async () => {
   const fake = createFakeSpawn();
   const result = await runStep(
-    { exe: "C:\\a.exe", args: [], timeoutMs: 1000, writes: { path: script, text: "ours" } },
+    { exe: "C:\\a.exe", args: [], timeoutMs: 1000, stdin: "select x\r\nexit\r\n" },
     { spawn: fake.spawn },
   );
-  assert.equal(result.ok, false);
-  assert.equal(fake.calls.length, 0);
+  assert.equal(result.ok, true);
+  assert.equal(fake.calls[0].stdin, "select x\r\nexit\r\n");
+
+  await runStep({ exe: "C:\\b.exe", args: [], timeoutMs: 1000 }, { spawn: fake.spawn });
+  assert.equal(fake.calls[1].stdin, "", "no stdin: closed empty");
+});
+
+test("run: an output line matching failPattern fails a step that exits 0", async () => {
+  const fake = createFakeSpawn(() => ({
+    stdout: ["Microsoft DiskPart\r\n", "Virtual Disk Service error:\r\n", "The file is in use.\r\n"],
+    code: 0,
+  }));
+  const result = await runStep(
+    { exe: "C:\\d.exe", args: [], timeoutMs: 1000, failPattern: /Virtual Disk Service error/ },
+    { spawn: fake.spawn },
+  );
+  assert.deepEqual(result, { ok: false, code: 0, error: "Virtual Disk Service error:" });
 });
 
 test("capture: keeps stdout lines only", async () => {

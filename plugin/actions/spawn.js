@@ -13,7 +13,9 @@ import path from "node:path";
 const OPTIONS = {
   shell: false,
   windowsHide: true,
-  stdio: ["ignore", "pipe", "pipe"],
+  // stdin is a pipe: a step may feed its commands there (diskpart). A step
+  // with nothing to feed closes it at once.
+  stdio: ["pipe", "pipe", "pipe"],
 };
 
 /**

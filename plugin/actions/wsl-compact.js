@@ -10,13 +10,16 @@
  *   %LOCALAPPDATA%\Packages\<distro>\LocalState\ext4.vhdx
  *   %LOCALAPPDATA%\Docker\wsl\**\*.vhdx
  *
- * diskpart reads its commands from a script file, so each disk path is
- * written into one. A path that could break out of its quotes is refused.
+ * diskpart reads its commands from stdin; nothing is written to disk. Each
+ * disk path goes inside quotes in those commands, so a path that could
+ * break out of them is refused. diskpart reads in the OEM code page, so
+ * only printable ASCII is allowed.
+ *
+ * Fed on stdin, diskpart does not stop at an error and still exits 0, so
+ * a step fails on diskpart's own error lines too.
  */
 
-import { randomUUID } from "node:crypto";
 import fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import { fileExists, system32 } from "./spawn.js";
@@ -24,6 +27,7 @@ import { fileExists, system32 } from "./spawn.js";
 const SHUTDOWN_TIMEOUT_MS = 2 * 60 * 1000;
 const COMPACT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const DOCKER_DEPTH = 4;
+const DISKPART_ERROR = /DiskPart has encountered an error|Virtual Disk Service error|DiskPart failed/i;
 
 export default {
   id: "wsl-compact",
@@ -46,59 +50,68 @@ export default {
 
   async steps(ctx) {
     const { wsl, diskpart } = tools(ctx.env);
-    const tmp = ctx.tmpdir ?? os.tmpdir();
     const disks = await findDisks(ctx.env);
 
     return [
       { exe: wsl, args: ["--shutdown"], timeoutMs: SHUTDOWN_TIMEOUT_MS },
-      ...disks.map((disk) => {
-        const script = path.win32.join(tmp, `riptide-compact-${randomUUID()}.txt`);
-        return {
-          exe: diskpart,
-          args: ["/s", script],
-          timeoutMs: COMPACT_TIMEOUT_MS,
-          label: `diskpart: compact ${disk}`,
-          writes: { path: script, text: compactScript(disk) },
-        };
-      }),
+      ...disks.map((disk) => ({
+        exe: diskpart,
+        args: [],
+        timeoutMs: COMPACT_TIMEOUT_MS,
+        label: `diskpart: compact ${disk}`,
+        stdin: compactScript(disk),
+        failPattern: DISKPART_ERROR,
+      })),
     ];
   },
 };
 
 /**
- * The diskpart script that compacts one disk.
+ * The diskpart commands that compact one disk.
  *
  * @param {string} disk
  * @returns {string}
  */
 export function compactScript(disk) {
-  if (!isSafeDiskPath(disk)) throw new Error(`refused disk path: ${JSON.stringify(disk)}`);
+  const problem = diskPathProblem(disk);
+  if (problem) throw new Error(`refused disk path (${problem}): ${JSON.stringify(disk)}`);
   return [
     `select vdisk file="${disk}"`,
     "attach vdisk readonly",
     "compact vdisk",
     "detach vdisk",
+    "exit",
     "",
   ].join("\r\n");
 }
 
 /**
- * A path that is safe inside diskpart's quotes: absolute on a drive, a
- * .vhdx, and free of quotes, line breaks and other control characters.
+ * Why a path is not safe inside diskpart's quotes, or null when it is:
+ * absolute on a drive, a .vhdx, printable ASCII only, no quote, no "..".
+ *
+ * The ASCII rule also shuts out every non-ASCII line break (U+0085,
+ * U+2028) and curly quote.
  *
  * @param {unknown} p
- * @returns {boolean}
+ * @returns {string|null}
  */
+export function diskPathProblem(p) {
+  if (typeof p !== "string") return "not a string";
+  // eslint-disable-next-line no-control-regex
+  if (/[^\x00-\x7f]/.test(p)) return "path has non-ASCII characters";
+  // Control characters are exactly what this refuses.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(p)) return "path has control characters";
+  if (p.includes('"')) return "path has a quote";
+  if (!/^[A-Za-z]:\\/.test(p)) return "not an absolute drive path";
+  if (!/\.vhdx$/i.test(p)) return "not a .vhdx";
+  if (p.split("\\").includes("..")) return "path has ..";
+  return null;
+}
+
+/** @param {unknown} p */
 export function isSafeDiskPath(p) {
-  return (
-    typeof p === "string" &&
-    /^[A-Za-z]:\\/.test(p) &&
-    /\.vhdx$/i.test(p) &&
-    // Control characters are exactly what this refuses.
-    // eslint-disable-next-line no-control-regex
-    !/["\u0000-\u001f\u007f]/.test(p) &&
-    !p.split("\\").includes("..")
-  );
+  return diskPathProblem(p) === null;
 }
 
 /**

@@ -1,16 +1,19 @@
 /**
  * Run an action: its steps one after another, each a spawned process.
  *
- * A step is {exe, args, timeoutMs, label?, writes?}. `writes` is a file the
- * step reads ({path, text}); it is created just before the spawn, refusing
- * to overwrite anything, and removed after.
+ * A step is {exe, args, timeoutMs, label?, stdin?, failPattern?}.
+ *
+ *   stdin        text written to the child's standard input, which is then
+ *                closed. Nothing is written to disk.
+ *   failPattern  an output line matching it fails the step whatever the
+ *                exit code. diskpart reading stdin reports an error in its
+ *                output and still exits 0.
  *
  * Output arrives as lines. Exit code 0 is success; any other code, a spawn
  * error, a timeout or an abort is failure, and the steps after it do not
  * run. A timeout or an abort kills the child.
  */
 
-import fsp from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -42,27 +45,15 @@ export async function runAction(action, ctx, { onLine = () => {}, signal } = {})
 /**
  * Run one step and wait for it.
  *
- * @param {{exe: string, args: string[], timeoutMs: number,
- *          writes?: {path: string, text: string}}} step
+ * @param {{exe: string, args: string[], timeoutMs: number, stdin?: string,
+ *          failPattern?: RegExp}} step
  * @param {{spawn: Function, onLine?: (line: string, stream: "stdout"|"stderr") => void,
  *          signal?: AbortSignal}} opts
  * @returns {Promise<{ok: boolean, code?: number|null, error?: string}>}
  */
 export async function runStep(step, { spawn, onLine = () => {}, signal }) {
   if (signal?.aborted) return { ok: false, error: "stopped" };
-
-  if (step.writes) {
-    try {
-      await fsp.writeFile(step.writes.path, step.writes.text, { flag: "wx" });
-    } catch (err) {
-      return { ok: false, error: `could not write ${path.basename(step.writes.path)}: ${err.message}` };
-    }
-  }
-  try {
-    return await spawnStep(step, { spawn, onLine, signal });
-  } finally {
-    if (step.writes) await fsp.rm(step.writes.path, { force: true });
-  }
+  return spawnStep(step, { spawn, onLine, signal });
 }
 
 /**
@@ -164,8 +155,19 @@ function spawnStep(step, { spawn, onLine, signal }) {
     );
     signal?.addEventListener("abort", onAbort, { once: true });
 
-    const out = createLineSplitter((line) => onLine(line, "stdout"));
-    const err = createLineSplitter((line) => onLine(line, "stderr"));
+    // A child that exits before reading all of it closes the pipe; that is
+    // its exit code's story, not an error here.
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(step.stdin ?? "");
+
+    // The first output line that says the step failed, when it has a pattern.
+    let reported = null;
+    const see = (stream) => (line) => {
+      if (!reported && step.failPattern?.test(line)) reported = line;
+      onLine(line, stream);
+    };
+    const out = createLineSplitter(see("stdout"));
+    const err = createLineSplitter(see("stderr"));
     child.stdout?.on("data", out.push);
     child.stderr?.on("data", err.push);
 
@@ -174,6 +176,7 @@ function spawnStep(step, { spawn, onLine, signal }) {
       out.flush();
       err.flush();
       if (killedFor) finish({ ok: false, code, error: killedFor });
+      else if (reported) finish({ ok: false, code, error: reported });
       else if (code === 0) finish({ ok: true, code });
       else if (code === null) finish({ ok: false, code, error: "ended without an exit code" });
       else finish({ ok: false, code, error: `exit code ${code}` });
