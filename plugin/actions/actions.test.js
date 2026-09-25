@@ -121,7 +121,7 @@ test("docker builder: bytes from df's build-cache reclaimable; exact argv", asyn
   assert.deepEqual(await dockerBuilderPrune.detect(ctx), { available: true, bytes: "812400000" });
   assert.deepEqual(fake.calls[0].args, ["system", "df", "--format", "json"]);
   assert.deepEqual(argvOf(await dockerBuilderPrune.steps(ctx)), [
-    [path.join(bin, "docker.exe"), "builder", "prune", "-f"],
+    [path.join(bin, "docker.exe"), "builder", "prune", "-a", "-f"],
   ]);
 });
 

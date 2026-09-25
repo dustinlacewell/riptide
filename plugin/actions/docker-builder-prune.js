@@ -1,5 +1,8 @@
 /**
- * docker builder prune -f: remove dangling build cache.
+ * docker builder prune -a -f: remove all build cache not in use.
+ *
+ * -a makes the removal match the "reclaimable" build-cache figure that
+ * `docker system df` reports, so the size shown is the size freed.
  */
 
 import { dockerDf, findDocker, parseDockerSize } from "./docker.js";
@@ -11,7 +14,7 @@ export default {
   label: "Docker build cache",
   tool: "docker",
   risk: "safe",
-  cost: "The next build redoes the removed layers.",
+  cost: "The next build of each image starts with no cache.",
 
   async detect(ctx) {
     const df = await dockerDf(ctx);
@@ -22,6 +25,6 @@ export default {
 
   async steps(ctx) {
     const exe = (await findDocker(ctx.env)) ?? "docker";
-    return [{ exe, args: ["builder", "prune", "-f"], timeoutMs: TIMEOUT_MS }];
+    return [{ exe, args: ["builder", "prune", "-a", "-f"], timeoutMs: TIMEOUT_MS }];
   },
 };
