@@ -71,7 +71,9 @@ plugin/
 src/
   App.jsx         scan form, results table, selection
   ConfirmDialog.jsx
-  api.js          NDJSON streaming client
+  source/
+    context.js    SourceProvider: data source, preference store, clock
+    httpSource.js NDJSON streaming client for the plugin's routes
 ```
 
 The MFT parsers are pure functions over buffers. `npm test` exercises them

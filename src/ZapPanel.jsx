@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
 import DeleteRun from "./DeleteRun.jsx";
@@ -34,6 +34,7 @@ export default function ZapPanel({
   onPrefsChange,
   onBusy,
 }) {
+  const api = useSource();
   const [patterns, setPatterns] = useState(prefs.patterns ?? "node_modules");
 
   const [scanning, setScanning] = useState(false);

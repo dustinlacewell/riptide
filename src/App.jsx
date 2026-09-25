@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as api from "./api.js";
+import { useSource, useStorage } from "./source/context.js";
 import ZapPanel from "./ZapPanel.jsx";
 import SearchPanel from "./SearchPanel.jsx";
 import CachePanel from "./CachePanel.jsx";
@@ -60,7 +60,9 @@ const SORT_KEYS = Object.keys(COLUMNS);
  * or search keeps running in a hidden tab, and its tab shows a busy mark.
  */
 export default function App() {
-  const [prefs, setPrefs] = useState(() => load(DEFAULTS, SORT_KEYS));
+  const api = useSource();
+  const store = useStorage();
+  const [prefs, setPrefs] = useState(() => load(store, DEFAULTS, SORT_KEYS));
 
   const [tab, setTab] = useState(TABS[prefs.tab] ? prefs.tab : "zap");
   const [root, setRoot] = useState(prefs.root);
@@ -75,7 +77,7 @@ export default function App() {
   const keepDrives = prefs.keepDrives;
   useEffect(() => {
     api.putSettings({ keepDrives }).catch((e) => setError(e.message));
-  }, [keepDrives]);
+  }, [api, keepDrives]);
 
   useEffect(() => {
     api
@@ -86,7 +88,7 @@ export default function App() {
         setRoot((current) => current || r.home);
       })
       .catch((e) => setError(e.message));
-  }, []);
+  }, [api]);
 
   // Panels report their own settings up; everything lands in one stored blob.
   const onPrefsChange = useCallback((patch) => {
@@ -115,8 +117,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    save({ ...prefs, root, recentRoots, tab });
-  }, [prefs, root, recentRoots, tab]);
+    save(store, { ...prefs, root, recentRoots, tab });
+  }, [store, prefs, root, recentRoots, tab]);
 
   const shared = { root, setRoot, chooseRoot, recentRoots, roots, prefs, onPrefsChange };
 

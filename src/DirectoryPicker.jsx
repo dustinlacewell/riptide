@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import { crumbs } from "./crumbs.js";
 import Dialog from "./ui/Dialog.jsx";
 
@@ -14,6 +14,7 @@ import Dialog from "./ui/Dialog.jsx";
  * root has no parent to walk up to.
  */
 export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
+  const api = useSource();
   // null path means the synthetic drive list; a string means a real listing.
   const [at, setAt] = useState(null);
   const [loaded, setLoaded] = useState(null);
@@ -45,7 +46,7 @@ export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
         setError(e.message);
         setLoaded({ path: at, parent: null, entries: [] });
       });
-  }, [at]);
+  }, [api, at]);
 
   // A listing left over from the folder we just left is not this folder's,
   // so it counts as still loading rather than as stale content to show.

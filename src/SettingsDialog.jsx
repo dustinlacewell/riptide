@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import { bytes } from "./format.js";
 import { KEEP_CHOICES } from "./persist.js";
 import Dialog from "./ui/Dialog.jsx";
@@ -12,6 +12,7 @@ import Dialog from "./ui/Dialog.jsx";
  * is not known and not shown.
  */
 export default function SettingsDialog({ keepDrives, onKeepDrives, onClose }) {
+  const api = useSource();
   const [perDrive, setPerDrive] = useState(null);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function SettingsDialog({ keepDrives, onKeepDrives, onClose }) {
       .getSettings()
       .then((s) => setPerDrive(s.bytesPerDrive))
       .catch(() => setPerDrive(null));
-  }, []);
+  }, [api]);
 
   return (
     <Dialog title="Settings" onClose={onClose} className="app-settings">

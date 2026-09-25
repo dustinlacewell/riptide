@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { IDLE, scanReducer } from "./scanStream.js";
+import { useClock } from "./source/context.js";
 
 const TICK_MS = 100;
-const defaultClock = () => performance.now();
 
 /**
  * Scan telemetry for one panel: the reducer in scanStream.js plus a
@@ -13,10 +13,10 @@ const defaultClock = () => performance.now();
  *   finish(done)   the run ended: {strategy?, stats?, elapsedMs?}
  *   reset()        back to nothing shown (a stop or a failure)
  *
- * @param {() => number} [clock] milliseconds; injected so a caller can
- *        drive time itself
+ * Time comes from the SourceProvider's clock.
  */
-export function useScanStream(clock = defaultClock) {
+export function useScanStream() {
+  const clock = useClock();
   const [state, dispatch] = useReducer(scanReducer, IDLE);
   const [now, setNow] = useState(0);
 

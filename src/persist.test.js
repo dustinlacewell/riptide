@@ -7,7 +7,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { load, remember, save, RECENT_LIMIT } from "./persist.js";
+import { load as loadFrom, remember, save as saveTo, RECENT_LIMIT } from "./persist.js";
+import { createMemoryStore } from "./storage.js";
 
 const DEFAULTS = {
   root: "",
@@ -16,22 +17,25 @@ const DEFAULTS = {
 };
 const KEYS = ["path", "bytes", "files", "mtime"];
 
-/** Minimal localStorage stand-in; `throws` simulates a blocked store. */
+const KEY = "riptide.prefs.v1";
+
+/** The store the next load/save uses; stubStorage replaces it. */
+let store = createMemoryStore();
+const load = (defaults, keys) => loadFrom(store, defaults, keys);
+const save = (prefs) => saveTo(store, prefs);
+
+/** A memory store holding `initial`; `throws` simulates a blocked store. */
 function stubStorage({ initial = null, throws = false } = {}) {
-  let value = initial;
-  globalThis.window = {
-    localStorage: {
-      getItem() {
-        if (throws) throw new Error("access denied");
-        return value;
-      },
-      setItem(_key, v) {
-        if (throws) throw new Error("access denied");
-        value = v;
-      },
-    },
-  };
-  return () => value;
+  if (throws) {
+    const denied = () => {
+      throw new Error("access denied");
+    };
+    store = { getItem: denied, setItem: denied };
+    return () => null;
+  }
+  const memory = createMemoryStore(initial === null ? {} : { [KEY]: initial });
+  store = memory;
+  return () => memory.getItem(KEY);
 }
 
 test("returns defaults when nothing is stored", () => {

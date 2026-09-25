@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import FileResult from "./FileResult.jsx";
 import RootField from "./RootField.jsx";
 import Callout from "./ui/Callout.jsx";
@@ -21,6 +21,7 @@ export default function SearchPanel({
   onPrefsChange,
   onBusy,
 }) {
+  const api = useSource();
   const [pattern, setPattern] = useState(prefs.pattern ?? "");
   const [globs, setGlobs] = useState(prefs.globs ?? "");
   const [caseMode, setCaseMode] = useState(prefs.caseMode ?? "smart");
@@ -85,7 +86,7 @@ export default function SearchPanel({
     } finally {
       if (id === runId.current) setSearching(false);
     }
-  }, [pattern, globs, caseMode, regex, root, onPrefsChange, run]);
+  }, [api, pattern, globs, caseMode, regex, root, onPrefsChange, run]);
 
   useEffect(() => onBusy?.(searching), [searching, onBusy]);
 

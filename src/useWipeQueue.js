@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { useClock } from "./source/context.js";
 import { tokenMs } from "./ui/motion.js";
 import { useLater } from "./ui/useLater.js";
 
@@ -13,6 +14,7 @@ import { useLater } from "./ui/useLater.js";
  * @returns {(paths: string[]) => void} queue paths that were just deleted
  */
 export function useWipeQueue(onDrop) {
+  const clock = useClock();
   const later = useLater();
   const queue = useRef([]);
   const armed = useRef(false);
@@ -20,13 +22,13 @@ export function useWipeQueue(onDrop) {
   return useCallback(
     (paths) => {
       const wipeMs = tokenMs("--t-base");
-      const at = performance.now() + wipeMs;
+      const at = clock() + wipeMs;
       for (const path of paths) queue.current.push({ path, at });
       if (armed.current) return;
       armed.current = true;
 
       const release = () => {
-        const now = performance.now();
+        const now = clock();
         const ready = queue.current.filter((q) => q.at <= now).map((q) => q.path);
         queue.current = queue.current.filter((q) => q.at > now);
         if (ready.length > 0) onDrop(ready);
@@ -36,6 +38,6 @@ export function useWipeQueue(onDrop) {
       };
       later(release, wipeMs);
     },
-    [later, onDrop],
+    [clock, later, onDrop],
   );
 }

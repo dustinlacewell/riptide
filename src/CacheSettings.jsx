@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import Dialog from "./ui/Dialog.jsx";
 import RiskBadge from "./RiskBadge.jsx";
 import { riskOf } from "./risk.js";
@@ -12,6 +12,7 @@ import { riskOf } from "./risk.js";
  * row in the table.
  */
 export default function CacheSettings({ disabled, onChange, onClose }) {
+  const api = useSource();
   const [configs, setConfigs] = useState(null);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
@@ -22,7 +23,7 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
       .cacheConfigs()
       .then((r) => setConfigs(r.configs))
       .catch((e) => setError(e.message));
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     searchRef.current?.focus();

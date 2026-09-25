@@ -1,4 +1,18 @@
+/**
+ * The real data source: the riptide Vite plugin's endpoints. See
+ * context.js for the seam this module fills.
+ */
 const BASE = "/__riptide";
+
+/** The real backend can do everything the UI offers. */
+export const caps = {
+  demo: false,
+  directoryPicker: true,
+  settings: true,
+  leaveGuard: true,
+  permanent: true,
+  fullRescan: true,
+};
 
 export async function getRoots() {
   const res = await fetch(`${BASE}/roots`);
@@ -21,11 +35,6 @@ export async function getDirs(path, { signal } = {}) {
  */
 export function scan({ root, patterns, full = false, onProgress, signal }) {
   return streamNdjson("/scan", { root, patterns, full }, onProgress, signal);
-}
-
-/** True for the rejection an aborted request produces. */
-export function isAbort(err) {
-  return err?.name === "AbortError";
 }
 
 /**

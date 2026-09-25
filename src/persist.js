@@ -35,14 +35,14 @@ export function remember(recent, root) {
  * localStorage throws outright in some contexts (private windows, blocked
  * site data), so every access is guarded and a failure degrades to defaults
  * rather than breaking the page.
- */
-/**
+ *
+ * @param {{getItem: Function, setItem: Function}} store see storage.js
  * @param {{root: string, patterns: string, sort: object}} defaults
  * @param {string[]} sortKeys sort keys this build understands
  */
-export function load(defaults, sortKeys) {
+export function load(store, defaults, sortKeys) {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = store.getItem(KEY);
     if (!raw) return defaults;
     return coerce(JSON.parse(raw), defaults, sortKeys);
   } catch {
@@ -50,9 +50,9 @@ export function load(defaults, sortKeys) {
   }
 }
 
-export function save(prefs) {
+export function save(store, prefs) {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(prefs));
+    store.setItem(KEY, JSON.stringify(prefs));
   } catch {
     /* storage unavailable or full — the app works without it */
   }

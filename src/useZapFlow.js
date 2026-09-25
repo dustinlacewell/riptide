@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import * as api from "./api.js";
+import { useClock, useSource } from "./source/context.js";
 import {
   applyActionNote,
   applyDeleteNote,
@@ -27,6 +27,8 @@ import { useWipeQueue } from "./useWipeQueue.js";
  *        the rows that actually went
  */
 export function useZapFlow(onDeleted) {
+  const api = useSource();
+  const clock = useClock();
   const [pending, setPending] = useState(null);
   const [planning, setPlanning] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -61,7 +63,7 @@ export function useZapFlow(onDeleted) {
     } finally {
       setPlanning(false);
     }
-  }, []);
+  }, [api]);
 
   // Give the row its wipe, then take it out of the table.
   const dropAfterWipe = useWipeQueue(
@@ -86,7 +88,7 @@ export function useZapFlow(onDeleted) {
         paths: plan.paths,
         sizes: sizes.current,
         permanent,
-        t: performance.now(),
+        t: clock(),
         actions: plan.actions ?? [],
       }),
     );
@@ -107,7 +109,7 @@ export function useZapFlow(onDeleted) {
           if (note.ok) dropAfterWipe([note.path]);
         },
       });
-      setRun((r) => r && finishRun(r, { t: performance.now(), elapsedMs: res.elapsedMs }));
+      setRun((r) => r && finishRun(r, { t: clock(), elapsedMs: res.elapsedMs }));
       // A row that was never on screen (a closed cache rule) still goes.
       dropAfterWipe(res.deleted);
     } catch (e) {
@@ -117,7 +119,7 @@ export function useZapFlow(onDeleted) {
       // Permanent is a per-run choice: the next plan starts on the Recycle Bin.
       setPermanent(false);
     }
-  }, [pending, permanent, dropAfterWipe]);
+  }, [api, clock, pending, permanent, dropAfterWipe]);
 
   return {
     pending,

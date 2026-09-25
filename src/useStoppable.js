@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isAbort } from "./api.js";
+import { isAbort } from "./source/errors.js";
 
 /**
  * One stoppable run at a time.

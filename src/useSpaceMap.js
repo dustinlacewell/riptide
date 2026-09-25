@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import { useScanStream } from "./useScanStream.js";
 import { useStoppable } from "./useStoppable.js";
 
@@ -19,6 +19,7 @@ import { useStoppable } from "./useStoppable.js";
  * starts again at the drive root.
  */
 export function useSpaceMap() {
+  const api = useSource();
   const run = useStoppable();
   const telemetry = useScanStream();
   const [map, setMap] = useState(null);
@@ -45,7 +46,7 @@ export function useSpaceMap() {
       pending.catch(() => cache.current.delete(key));
     }
     return pending;
-  }, []);
+  }, [api]);
 
   const show = useCallback(
     async function showPage(id) {
@@ -103,7 +104,7 @@ export function useSpaceMap() {
         return api.mapOffer({ drive: m.drive, gen: e.stale.gen, recNos });
       }
     },
-    [adopt],
+    [api, adopt],
   );
 
   const read = useCallback(
@@ -136,7 +137,7 @@ export function useSpaceMap() {
         setReading(false);
       }
     },
-    [adopt, run, show, telemetry],
+    [api, adopt, run, show, telemetry],
   );
 
   return useMemo(

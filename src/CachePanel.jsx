@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as api from "./api.js";
+import { useSource } from "./source/context.js";
 import { reclaimOf } from "./reclaim.js";
 import { riskOf } from "./risk.js";
 import { enterDelay } from "./rowEnter.js";
@@ -49,6 +49,7 @@ export default function CachePanel({
   onPrefsChange,
   onBusy,
 }) {
+  const api = useSource();
   // prefs.disabledCaches is a fresh array each render, so scan would be
   // rebuilt every time if it depended on the array itself. The joined key is
   // stable for the same set of ids.
@@ -152,7 +153,7 @@ export default function CachePanel({
     } finally {
       setLoading(false);
     }
-  }, [flow, run, telemetry, disabled, root]);
+  }, [api, flow, run, telemetry, disabled, root]);
 
   // The Untouched filter narrows everything below it — table, bulk buttons,
   // summary and zap plan — so a hidden row can never be deleted unseen.
