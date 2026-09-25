@@ -1,0 +1,151 @@
+---
+import { entries, groupsOf } from "../data/packs";
+
+const TOOLS = [
+  {
+    name: "Zap",
+    about: "Find folders by name and send them to the Recycle Bin.",
+    example: "Every node_modules under D:\\code.",
+  },
+  {
+    name: "Caches",
+    about: "Find tool caches and build folders you can safely delete.",
+    example: "Each Cargo target folder, with how long its project has gone untouched.",
+  },
+  {
+    name: "Map",
+    about: "See where all the space on a drive went.",
+    example: "A space map of C:\\ you can click down into.",
+  },
+  {
+    name: "Search",
+    about: "Search file contents with ripgrep.",
+    example: "Every file under D:\\code that contains TODO.",
+  },
+];
+
+const groups = groupsOf(entries);
+---
+
+<section class="wrap section" aria-labelledby="finds">
+  <h2 id="finds">What it finds</h2>
+
+  <ul class="tools">
+    {
+      TOOLS.map((t) => (
+        <li class="panel tool">
+          <h3>{t.name}</h3>
+          <p>{t.about}</p>
+          <p class="example dim">{t.example}</p>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h3 class="count">
+    <span class="mono">{entries.length}</span> known caches
+  </h3>
+  <ul class="groups">
+    {
+      groups.map((g) => (
+        <li>
+          <details>
+            <summary>
+              <span>{g.name}</span>
+              <span class="mono dim">{g.labels.length}</span>
+            </summary>
+            <p class="dim">{g.labels.join(", ")}</p>
+          </details>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .tools {
+    list-style: none;
+    margin: var(--s-5) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+  }
+
+  .tool {
+    padding: var(--s-5);
+  }
+
+  .tool h3 {
+    margin: 0 0 var(--s-2);
+    font-size: var(--fs-title);
+  }
+
+  .tool p {
+    margin: 0;
+  }
+
+  .tool .example {
+    margin-top: var(--s-2);
+    font-size: var(--fs-body);
+  }
+
+  .count {
+    margin: var(--s-6) 0 var(--s-3);
+    font-size: var(--fs-title);
+  }
+
+  .groups {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--s-5);
+  }
+
+  .groups li {
+    border-bottom: 1px solid var(--line);
+  }
+
+  summary {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: 44px;
+    align-items: center;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary::after {
+    content: "+";
+    color: var(--dim);
+    font-family: var(--font-mono);
+    width: 1ch;
+  }
+
+  details[open] summary::after {
+    content: "\2212";
+  }
+
+  summary span:first-child {
+    flex: 1;
+  }
+
+  details p {
+    margin: 0 0 var(--s-3);
+    font-size: var(--fs-body);
+  }
+
+  @media (max-width: 640px) {
+    .tools,
+    .groups {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

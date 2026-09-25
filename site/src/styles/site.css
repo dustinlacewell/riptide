@@ -1,0 +1,99 @@
+/* Site-wide rules. Colors, type faces, radii, spacing and motion come from
+   the app's tokens (src/ui/tokens.css). Only page-scale sizes live here. */
+
+:root {
+  --site-width: 1080px;
+  --gutter: var(--s-4);
+  --fs-lead: 18px;
+  --fs-section: 28px;
+  --section-gap: 96px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--current);
+}
+
+:focus-visible {
+  outline: 2px solid var(--current);
+  outline-offset: 2px;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+code {
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.wrap {
+  max-width: var(--site-width);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.caps {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.section {
+  padding-top: var(--section-gap);
+}
+
+.section h2 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-section);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.section .lead {
+  margin: 0 0 var(--s-5);
+  max-width: 62ch;
+  color: var(--dim);
+  font-size: var(--fs-lead);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --section-gap: 64px;
+    --fs-lead: 16px;
+    --fs-section: 24px;
+  }
+}

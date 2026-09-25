@@ -1,0 +1,74 @@
+---
+import RiskBadge from "./RiskBadge.astro";
+
+const RISKS = [
+  { risk: "safe", meaning: "Rebuilds or re-downloads by itself." },
+  { risk: "caution", meaning: "Costs you something to get back." },
+  { risk: "refused", meaning: "Screened out. riptide never deletes it." },
+] as const;
+
+const RULES = [
+  "Deletes go to the Recycle Bin. Permanent delete is a checkbox you tick each time.",
+  "The server deletes only paths one of its own scans found.",
+  "Drive roots, Windows, Program Files, user profile roots and key folders are refused.",
+  "Before a delete, riptide checks each build folder still sits next to its marker, such as a target folder next to Cargo.toml.",
+  "You type the count to confirm.",
+];
+---
+
+<section class="wrap section" aria-labelledby="safe">
+  <h2 id="safe">Every row shows its risk</h2>
+
+  <ul class="risks">
+    {
+      RISKS.map((r) => (
+        <li>
+          <RiskBadge risk={r.risk} />
+          <span>{r.meaning}</span>
+        </li>
+      ))
+    }
+  </ul>
+
+  <h3>How a delete is kept safe</h3>
+  <ol class="rules">
+    {RULES.map((rule) => <li>{rule}</li>)}
+  </ol>
+</section>
+
+<style>
+  .risks {
+    list-style: none;
+    margin: var(--s-5) 0 0;
+    padding: 0;
+  }
+
+  .risks li {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: var(--s-4);
+    align-items: center;
+    min-height: 52px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  h3 {
+    margin: var(--s-6) 0 var(--s-3);
+    font-size: var(--fs-title);
+  }
+
+  .rules {
+    margin: 0;
+    padding-left: var(--s-5);
+    max-width: 68ch;
+  }
+
+  .rules li + li {
+    margin-top: var(--s-2);
+  }
+
+  .rules li::marker {
+    color: var(--dim);
+    font-family: var(--font-mono);
+  }
+</style>

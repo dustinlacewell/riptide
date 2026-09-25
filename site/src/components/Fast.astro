@@ -1,0 +1,59 @@
+---
+---
+
+<section class="wrap section" aria-labelledby="fast">
+  <h2 id="fast">Reads the file table, not the folders</h2>
+  <p class="lead">
+    riptide opens the raw volume and reads the NTFS Master File Table in one sequential pass. It
+    never walks the folder tree.
+  </p>
+
+  <div class="facts">
+    <div class="panel fact">
+      <span class="caps">First read</span>
+      <span class="mono figure">4.87M records in 26 s</span>
+      <span class="dim">On the author's machine.</span>
+    </div>
+    <div class="panel fact">
+      <span class="caps">Rescan</span>
+      <span class="mono figure">Under 1 s</span>
+      <span class="dim">After the first read. Updates come from the NTFS change journal.</span>
+    </div>
+    <div class="panel fact">
+      <span class="caps">Without admin rights</span>
+      <span class="mono figure">Directory walk</span>
+      <span class="dim">Slower, same results. riptide says which one ran.</span>
+    </div>
+  </div>
+</section>
+
+<style>
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-4);
+  }
+
+  .fact {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-5);
+  }
+
+  .figure {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .fact .dim {
+    font-size: var(--fs-body);
+  }
+
+  @media (max-width: 860px) {
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

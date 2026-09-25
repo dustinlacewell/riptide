@@ -1,0 +1,21 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="wrap">
+  <span class="dim">© {year} ldlework</span>
+  <a href="https://ldlework.com">ldlework.com</a>
+</footer>
+
+<style>
+  footer {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-4);
+    margin-top: var(--section-gap);
+    padding-top: var(--s-5);
+    padding-bottom: var(--s-6);
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-body);
+  }
+</style>

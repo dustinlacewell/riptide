@@ -1,0 +1,25 @@
+---
+import Base from "../layouts/Base.astro";
+import Hero from "../components/Hero.astro";
+import Finds from "../components/Finds.astro";
+import Fast from "../components/Fast.astro";
+import Safe from "../components/Safe.astro";
+import Commands from "../components/Commands.astro";
+import GetIt from "../components/GetIt.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Base
+  title="riptide"
+  description="Find build junk across a Windows drive, uncheck what you keep, and delete the rest."
+>
+  <Hero />
+  <main>
+    <Finds />
+    <Fast />
+    <Safe />
+    <Commands />
+    <GetIt />
+  </main>
+  <Footer />
+</Base>

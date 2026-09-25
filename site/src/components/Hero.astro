@@ -1,0 +1,94 @@
+---
+import WaveMark from "./WaveMark.astro";
+import Telemetry from "./Telemetry.astro";
+---
+
+<header class="wrap hero">
+  <div class="copy">
+    <div class="wordmark">
+      <WaveMark size={36} />
+      <span>riptide</span>
+    </div>
+    <h1>Find build junk across a drive. Uncheck what you keep. Delete the rest.</h1>
+    <p class="lead">
+      A disk cleaner for Windows developers. It runs on your machine and opens in your browser.
+      Nothing is uploaded.
+    </p>
+    {/* TODO: point "Get riptide" at the source repo once its URL is public. */}
+    <a class="cta" href="#get">Get riptide</a>
+  </div>
+  <Telemetry />
+</header>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--s-6);
+    align-items: center;
+    padding-top: 72px;
+  }
+
+  .copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-5);
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--current);
+  }
+
+  .wordmark span {
+    color: var(--text);
+    font-size: var(--fs-stat);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(32px, 5vw, 44px);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+  }
+
+  .lead {
+    margin: 0;
+    max-width: 48ch;
+    color: var(--dim);
+    font-size: var(--fs-lead);
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    height: 52px;
+    padding: 0 var(--s-5);
+    border-radius: var(--r-md);
+    background: var(--current);
+    color: var(--on-accent);
+    font-size: var(--fs-title);
+    font-weight: 700;
+    text-decoration: none;
+    transition: filter var(--t-quick) var(--ease-out);
+  }
+
+  .cta:hover {
+    filter: brightness(1.08);
+  }
+
+  @media (max-width: 860px) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-5);
+      padding-top: var(--s-6);
+    }
+  }
+</style>

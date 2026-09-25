@@ -1,0 +1,53 @@
+---
+/**
+ * A risk badge as the app draws it (src/RiskBadge.jsx, src/ui/Glyph.jsx):
+ * its own glyph plus the word, so it reads without color.
+ */
+type Risk = "safe" | "caution" | "refused";
+const { risk } = Astro.props as { risk: Risk };
+const LABEL: Record<Risk, string> = { safe: "Safe", caution: "Caution", refused: "Refused" };
+---
+
+<span class={`risk risk-${risk}`}>
+  <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true">
+    {risk === "safe" && <circle cx="6" cy="6" r="5" fill="currentColor" />}
+    {risk === "caution" && <path d="M6 1 11.5 11H.5Z" fill="currentColor" />}
+    {
+      risk === "refused" && (
+        <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <circle cx="6" cy="6" r="4.6" />
+          <path d="M2.8 9.2 9.2 2.8" />
+        </g>
+      )
+    }
+  </svg>
+  {LABEL[risk]}
+</span>
+
+<style>
+  .risk {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-caps);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .risk-safe {
+    color: var(--safe);
+    background: var(--safe-wash);
+  }
+  .risk-caution {
+    color: var(--caution);
+    background: var(--caution-wash);
+  }
+  .risk-refused {
+    color: var(--refused);
+    background: var(--refused-wash);
+  }
+</style>

@@ -1,0 +1,181 @@
+---
+/**
+ * A scan played back as an illustration: records count up behind a flow
+ * bar, then a reclaim figure rolls up. The markup holds the final state, so
+ * with no script or with reduced motion the block reads as finished.
+ */
+const RECORDS = 4_870_000;
+const RECLAIM_GB = 41.8;
+---
+
+<figure class="telemetry panel" data-records={RECORDS} data-reclaim={RECLAIM_GB}>
+  <div class="head">
+    <span class="caps">Scan</span>
+    <span class="caps">Illustration</span>
+  </div>
+
+  <div class="flow" aria-hidden="true">
+    <div class="flow-fill" data-flow style="width: 100%"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <span class="caps">Records</span>
+      <span class="mono value" data-records-out>4.87M</span>
+    </div>
+    <div class="stat">
+      <span class="caps">Reclaim</span>
+      <span class="mono value reclaim"><span data-reclaim-out>41.8</span><span class="unit">GB</span></span>
+    </div>
+  </div>
+
+  <figcaption class="dim">Not a benchmark.</figcaption>
+</figure>
+
+<script>
+  const RECORDS_MS = 2600;
+  const RECLAIM_MS = 1200;
+
+  const root = document.querySelector<HTMLElement>(".telemetry");
+  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (root && !calm) play(root);
+
+  function play(el: HTMLElement) {
+    const records = Number(el.dataset.records);
+    const reclaim = Number(el.dataset.reclaim);
+    const flow = el.querySelector<HTMLElement>("[data-flow]")!;
+    const recordsOut = el.querySelector<HTMLElement>("[data-records-out]")!;
+    const reclaimOut = el.querySelector<HTMLElement>("[data-reclaim-out]")!;
+
+    el.classList.add("playing");
+    tween(RECORDS_MS, (t) => {
+      flow.style.width = `${t * 100}%`;
+      recordsOut.textContent = formatRecords(records * t);
+    }).then(() => {
+      el.classList.remove("playing");
+      el.classList.add("surged");
+      return tween(RECLAIM_MS, (t) => {
+        reclaimOut.textContent = (reclaim * easeOut(t)).toFixed(1);
+      });
+    });
+  }
+
+  function tween(ms: number, step: (t: number) => void): Promise<void> {
+    return new Promise((done) => {
+      const start = performance.now();
+      const frame = (now: number) => {
+        const t = Math.min(1, (now - start) / ms);
+        step(t);
+        if (t < 1) requestAnimationFrame(frame);
+        else done();
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function easeOut(t: number) {
+    return 1 - (1 - t) ** 3;
+  }
+
+  function formatRecords(n: number) {
+    if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
+    return String(Math.round(n));
+  }
+</script>
+
+<style>
+  .telemetry {
+    margin: 0;
+    padding: var(--s-4) var(--s-5) var(--s-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+
+  .head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-3);
+  }
+
+  .flow {
+    height: 14px;
+    border-radius: var(--r-pill);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  .flow-fill {
+    height: 100%;
+    border-radius: var(--r-pill);
+    background-color: var(--current);
+    background-image: repeating-linear-gradient(
+      120deg,
+      transparent 0 10px,
+      var(--streak) 10px 16px
+    );
+  }
+
+  .playing .flow-fill {
+    animation: drift 700ms linear infinite;
+  }
+
+  .surged .flow {
+    animation: glow var(--t-surge) var(--ease-surge);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-5);
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+  }
+
+  .value {
+    font-size: var(--fs-stat);
+    font-weight: 600;
+    line-height: 1.1;
+  }
+
+  .reclaim {
+    color: var(--current);
+  }
+
+  .unit {
+    margin-left: var(--s-2);
+    color: var(--dim);
+    font-size: var(--fs-title);
+  }
+
+  figcaption {
+    font-size: var(--fs-body);
+  }
+
+  @keyframes drift {
+    to {
+      background-position: 18.48px 0;
+    }
+  }
+
+  @keyframes glow {
+    35% {
+      box-shadow: 0 0 24px 4px var(--current-glow);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .playing .flow-fill,
+    .surged .flow {
+      animation: none;
+    }
+  }
+</style>

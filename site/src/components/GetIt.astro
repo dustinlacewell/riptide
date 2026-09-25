@@ -1,0 +1,72 @@
+---
+---
+
+<section class="wrap section" id="get" aria-labelledby="get-title">
+  <h2 id="get-title">Get riptide</h2>
+
+  <div class="cols">
+    <div>
+      <h3>Needs</h3>
+      <ul>
+        <li>Windows, with NTFS drives.</li>
+        <li>Node.js.</li>
+        <li>ripgrep (<code>rg</code>) on your PATH, for Search.</li>
+        <li>Admin rights for the fast scan. Without them, riptide walks the folders.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3>Run</h3>
+      {/* TODO: add the repository URL to step 1 once it is public. */}
+      <ol>
+        <li>Clone the repository.</li>
+        <li><code>npm install</code></li>
+        <li>
+          <code>npm run dev</code>
+          <span class="dim">Windows asks for admin rights, then riptide opens in a new console.</span>
+        </li>
+        <li>Open the local address it prints.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<style>
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-6);
+  }
+
+  h3 {
+    margin: var(--s-4) 0 var(--s-3);
+    font-size: var(--fs-title);
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding-left: var(--s-5);
+  }
+
+  li + li {
+    margin-top: var(--s-2);
+  }
+
+  li .dim {
+    display: block;
+    font-size: var(--fs-body);
+  }
+
+  ol li::marker {
+    color: var(--dim);
+    font-family: var(--font-mono);
+  }
+
+  @media (max-width: 640px) {
+    .cols {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+  }
+</style>
