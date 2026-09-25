@@ -103,6 +103,8 @@ export function useZapFlow(onDeleted) {
       setError(e.message);
     } finally {
       setDeleting(false);
+      // Permanent is a per-run choice: the next plan starts on the Recycle Bin.
+      setPermanent(false);
     }
   }, [pending, permanent, dropAfterWipe]);
 
