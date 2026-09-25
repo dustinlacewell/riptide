@@ -119,8 +119,13 @@ test("class: tone, depth, lock and selection", () => {
   );
 });
 
-test("strip: a still tile shows its junk share; a junk tile shows none", () => {
-  assert.equal(junkShare({ kind: "folder", bytes: 200, junkBytes: 50 }), 0.25);
-  assert.equal(junkShare({ kind: "folder", bytes: 200, junkBytes: 200, junk: "name-hit" }), 0);
-  assert.equal(junkShare({ kind: "folder", bytes: 0, junkBytes: 0 }), 0);
+test("strip: a still tile shows its junk share by risk; a junk tile shows none", () => {
+  assert.deepEqual(junkShare({ kind: "folder", bytes: 200, junkBytes: 50 }), { safe: 0.25, caution: 0 });
+  assert.deepEqual(
+    junkShare({ kind: "folder", bytes: 200, junkBytes: 100, cautionBytes: 20 }),
+    { safe: 0.4, caution: 0.1 },
+  );
+  const none = { safe: 0, caution: 0 };
+  assert.deepEqual(junkShare({ kind: "folder", bytes: 200, junkBytes: 200, junk: "name-hit" }), none);
+  assert.deepEqual(junkShare({ kind: "folder", bytes: 0, junkBytes: 0 }), none);
 });

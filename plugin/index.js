@@ -432,16 +432,24 @@ async function zapRoute(req, res) {
 
 /**
  * Read a whole drive into a space-map snapshot. Streams the MFT progress
- * notes, then "compact", then one done line naming the snapshot.
+ * notes, then "junk" and "compact", then one done line naming the snapshot.
  */
 async function mapReadRoute(req, res) {
   const signal = abortOnDisconnect(res);
 
-  const { root } = await body(req);
+  const { root, patterns, disabled } = await body(req);
   if (signal.aborted) return;
 
   const drive = typeof root === "string" ? driveOf(root.trim()) : null;
   if (!drive) return json(res, 400, { error: "root must be a path on a drive" });
+
+  // The junk marks use the same rules as the other tabs: the enabled cache
+  // entries and the Zap tab's folder names.
+  const { entries: all } = await loadPacks();
+  const off = new Set(Array.isArray(disabled) ? disabled : []);
+  const entries = all.filter((e) => !off.has(e.id));
+  const { drives } = await listRoots();
+  if (signal.aborted) return;
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson",
@@ -454,6 +462,9 @@ async function mapReadRoute(req, res) {
       drive,
       root: root.trim(),
       store: maps,
+      entries,
+      patterns: normalizePatterns(patterns),
+      drives,
       signal,
       onProgress: (note) => write({ type: "progress", ...note }),
     });

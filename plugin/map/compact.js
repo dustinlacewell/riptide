@@ -11,6 +11,7 @@
  *   bytes      Float64  logical size of everything beneath, own files too
  *   ownBytes   Float64  logical size of the files directly in the folder
  *   junkBytes  Float64  the part of bytes that junk folders hold
+ *   cautionBytes Float64 the part of junkBytes in caution caches
  *   files      Uint32   file count beneath
  *   ownFiles   Uint32   files directly in the folder
  *   flags      Uint8    see flags.js
@@ -31,7 +32,7 @@
  */
 
 import { ROOT_RECORD } from "../mft/tree.js";
-import { REMOVED, SYNTHETIC, isJunk } from "./flags.js";
+import { CACHE_CAUTION, REMOVED, SYNTHETIC, isJunk } from "./flags.js";
 
 export const UNREACHABLE_NAME = "(unreachable)";
 
@@ -204,6 +205,7 @@ function allocate(n, span) {
     bytes: new Float64Array(n),
     ownBytes: new Float64Array(n),
     junkBytes: new Float64Array(n),
+    cautionBytes: new Float64Array(n),
     files: new Uint32Array(n),
     ownFiles: new Uint32Array(n),
     flags: new Uint8Array(n),
@@ -257,12 +259,18 @@ function rollUp(snap) {
   snap.bytes.set(snap.ownBytes);
   snap.files.set(snap.ownFiles);
   for (let id = snap.count - 1; id >= 0; id--) {
-    if (isJunk(snap.flags[id])) snap.junkBytes[id] = snap.bytes[id];
+    const flags = snap.flags[id];
+    // The outermost junk folder decides: all its bytes are junk, of its kind.
+    if (isJunk(flags)) {
+      snap.junkBytes[id] = snap.bytes[id];
+      snap.cautionBytes[id] = flags & CACHE_CAUTION ? snap.bytes[id] : 0;
+    }
     const p = snap.parentId[id];
     if (p < 0) continue;
     snap.bytes[p] += snap.bytes[id];
     snap.files[p] += snap.files[id];
     snap.junkBytes[p] += snap.junkBytes[id];
+    snap.cautionBytes[p] += snap.cautionBytes[id];
   }
 }
 
@@ -289,14 +297,20 @@ function subtractFromAncestors(snap, id) {
   const bytes = snap.bytes[id];
   const files = snap.files[id];
   let junk = snap.junkBytes[id];
+  let caution = snap.cautionBytes[id];
 
   for (let a = snap.parentId[id]; a >= 0; a = snap.parentId[a]) {
     snap.bytes[a] -= bytes;
     snap.files[a] -= files;
-    // A junk folder counts all its bytes as junk, so its ancestors lose
-    // everything that left it.
-    if (isJunk(snap.flags[a])) junk = bytes;
+    // A junk folder counts all its bytes as junk of its own kind, so its
+    // ancestors lose everything that left it, as that kind.
+    const flags = snap.flags[a];
+    if (isJunk(flags)) {
+      junk = bytes;
+      caution = flags & CACHE_CAUTION ? bytes : 0;
+    }
     snap.junkBytes[a] -= junk;
+    snap.cautionBytes[a] -= caution;
     sortChildren(snap, a);
   }
 }

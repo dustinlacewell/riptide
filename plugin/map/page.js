@@ -119,6 +119,7 @@ function describe(snap, id) {
     files: snap.files[id],
     junk: junkKind(flags),
     junkBytes: snap.junkBytes[id],
+    cautionBytes: snap.cautionBytes[id],
     hasKids: snap.childStart[id + 1] > snap.childStart[id],
   };
   const label = snap.labels.get(id);

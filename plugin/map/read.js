@@ -2,6 +2,7 @@
  * Read one drive for the space map: the I/O around compact.js.
  *
  *   read      the drive's MFT, through the injected readTree
+ *   junk      mark cache hits and name hits (junk.js)
  *   compact   the tree into a snapshot; the tree is dropped after
  *   publish   into the store, only once everything above has finished
  *
@@ -12,13 +13,17 @@
 import fsp from "node:fs/promises";
 
 import { readVolumeTree } from "../mft/scan.js";
+import { buildNameQuery } from "../mft/filenames.js";
+import { collectNeeds } from "../caches/needs.js";
 import { buildSnapshot } from "./compact.js";
+import { junkMarks } from "./junk.js";
 import { idOfPath } from "./page.js";
 
 const now = () => performance.now();
 
 /**
  * @param {{drive: string, root?: string|null, store: object,
+ *          entries?: object[], patterns?: string[], drives?: string[], env?: object,
  *          readTree?: typeof readVolumeTree,
  *          usedSpace?: (drive: string) => Promise<number|null>,
  *          onProgress?: (n: object) => void, signal?: AbortSignal,
@@ -30,6 +35,10 @@ export async function readMap({
   drive,
   root = null,
   store,
+  entries = [],
+  patterns = [],
+  drives = [],
+  env = process.env,
   readTree = readVolumeTree,
   usedSpace = volumeUsed,
   onProgress = () => {},
@@ -37,8 +46,9 @@ export async function readMap({
   clock = now,
 }) {
   const run = store.begin(drive, signal);
+  const opts = { drive, root, store, entries, patterns, drives, env };
   try {
-    return await readAndPublish({ drive, root, store, readTree, usedSpace, onProgress, clock }, run.signal);
+    return await readAndPublish({ ...opts, readTree, usedSpace, onProgress, clock }, run.signal);
   } finally {
     run.end();
   }
@@ -59,15 +69,25 @@ export async function volumeUsed(drive) {
 
 // ---------------------------------------------------------------------------
 
-async function readAndPublish({ drive, root, store, readTree, usedSpace, onProgress, clock }, signal) {
+async function readAndPublish(opts, signal) {
+  const { drive, root, store, readTree, usedSpace, onProgress, clock } = opts;
   signal.throwIfAborted();
   const started = clock();
-  const volume = await readTree(drive, { onProgress, signal });
+  // The cache filters ask about files (a Cargo.toml beside a target), and
+  // files are dropped as the MFT streams; the query keeps what they need.
+  const query = buildNameQuery(collectNeeds(opts.entries));
+  const volume = await readTree(drive, { query, onProgress, signal });
+  signal.throwIfAborted();
+
+  const junkStart = clock();
+  onProgress({ stage: "junk" });
+  const junk = junkMarks(volume, opts);
+  const junkMs = clock() - junkStart;
   signal.throwIfAborted();
 
   const compactStart = clock();
   onProgress({ stage: "compact" });
-  const snap = buildSnapshot(volume);
+  const snap = buildSnapshot(volume, { junk });
   const compactMs = clock() - compactStart;
 
   const used = await usedSpace(drive);
@@ -85,7 +105,9 @@ async function readAndPublish({ drive, root, store, readTree, usedSpace, onProgr
     stats: {
       records: volume.recordsDone,
       readMs: volume.readMs,
+      junkMs,
       compactMs,
+      junkBytes: snap.junkBytes[0],
       totalMs: clock() - started,
       folders: snap.count,
       rootBytes: snap.bytes[0],

@@ -70,7 +70,8 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
 
 function Tile({ tile, selected, hovered, onEnter, onClick }) {
   const share = junkShare(tile);
-  const strip = share > 0 && tile.h > STRIP * 3;
+  const strip = share.safe + share.caution > 0 && tile.h > STRIP * 3;
+  const stripY = tile.y + tile.h - STRIP;
   const labelY = tile.y + 13;
 
   return (
@@ -93,13 +94,22 @@ function Tile({ tile, selected, hovered, onEnter, onClick }) {
         <rect className="map-tile-hatch" x={tile.x} y={tile.y} width={tile.w} height={tile.h} />
       )}
       {strip && (
-        <rect
-          className={`map-tile-strip map-tile-strip--${stripTone(tile)}`}
-          x={tile.x}
-          y={tile.y + tile.h - STRIP}
-          width={tile.w * share}
-          height={STRIP}
-        />
+        <>
+          <rect
+            className="map-tile-strip map-tile-strip--safe"
+            x={tile.x}
+            y={stripY}
+            width={tile.w * share.safe}
+            height={STRIP}
+          />
+          <rect
+            className="map-tile-strip map-tile-strip--caution"
+            x={tile.x + tile.w * share.safe}
+            y={stripY}
+            width={tile.w * share.caution}
+            height={STRIP}
+          />
+        </>
       )}
       {tile.text && (
         <text className="map-tile-label" x={tile.x + 4} y={labelY}>
@@ -114,10 +124,4 @@ function Tile({ tile, selected, hovered, onEnter, onClick }) {
       <title>{`${tile.name} · ${bytes(tile.bytes)}`}</title>
     </g>
   );
-}
-
-// The strip takes the colour of the riskiest junk the tile holds. The page
-// does not say which kinds sit inside, so it is the safe colour.
-function stripTone() {
-  return "safe";
 }

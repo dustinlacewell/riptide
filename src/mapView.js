@@ -81,12 +81,20 @@ export function drillable(tile) {
 }
 
 /**
- * Share of a still tile's bytes that junk folders hold, 0..1. Junk tiles
- * are filled whole, so they carry no strip.
+ * Shares of a still tile's bytes that junk folders hold, split by risk,
+ * each 0..1. Junk tiles are filled whole, so they carry no strip.
+ *
+ * @returns {{safe: number, caution: number}}
  */
 export function junkShare(tile) {
-  if (toneOf(tile) !== "still" || !(tile.bytes > 0)) return 0;
-  return Math.min(1, Math.max(0, (tile.junkBytes ?? 0) / tile.bytes));
+  if (toneOf(tile) !== "still" || !(tile.bytes > 0)) return { safe: 0, caution: 0 };
+  const junk = clamp01((tile.junkBytes ?? 0) / tile.bytes);
+  const caution = Math.min(junk, clamp01((tile.cautionBytes ?? 0) / tile.bytes));
+  return { safe: junk - caution, caution };
+}
+
+function clamp01(n) {
+  return Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));
 }
 
 /**
@@ -160,6 +168,7 @@ function toTile({ item, x, y, w, h }, depth, parent = null) {
     files: row.files,
     junk: row.junk ?? null,
     junkBytes: row.junkBytes ?? 0,
+    cautionBytes: row.cautionBytes ?? 0,
     label: row.label ?? null,
     locked: row.locked ?? null,
     hasKids: row.hasKids === true,

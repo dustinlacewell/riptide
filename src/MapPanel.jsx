@@ -15,7 +15,7 @@ const PREFETCH = 3;
  * ranked list. One MFT read per drive; opening a folder asks the server
  * for that folder's page and reads nothing again.
  */
-export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots, onBusy }) {
+export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots, prefs, onBusy }) {
   const space = useSpaceMap();
   const { page, map } = space;
   const [hoverId, setHoverId] = useState(null);
@@ -60,7 +60,13 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
           recent={recentRoots}
           placeholder="C:\"
         />
-        <button className="primary" onClick={() => space.read(root)} disabled={space.reading || !root}>
+        <button
+          className="primary"
+          onClick={() =>
+            space.read(root, { patterns: prefs.patterns, disabled: prefs.disabledCaches })
+          }
+          disabled={space.reading || !root}
+        >
           {space.reading ? "Reading…" : "Read drive"}
         </button>
         {space.reading && <button onClick={space.stop}>Stop</button>}
@@ -95,8 +101,16 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
             })}
             <span className="map-total">
               {bytes(page.node.bytes)} · {page.node.files.toLocaleString()} files
+              {page.node.junkBytes > 0 && ` · ${bytes(page.node.junkBytes)} junk`}
             </span>
           </nav>
+
+          <ul className="map-legend" aria-label="Colours">
+            <li className="map-key map-key--safe">Safe to delete</li>
+            <li className="map-key map-key--caution">Caution</li>
+            <li className="map-key map-key--refused">Refused</li>
+            <li className="map-key map-key--still">Other folders</li>
+          </ul>
 
           <div className="map-body" aria-busy={space.loading}>
             <Treemap

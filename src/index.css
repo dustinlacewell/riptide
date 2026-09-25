@@ -1406,6 +1406,44 @@ button.row.up .row-name {
   color: var(--dim);
 }
 
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--dim);
+  font-size: var(--fs-caps);
+}
+
+.map-key::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--s-1);
+  vertical-align: -1px;
+  border-radius: 2px;
+  background: var(--still-2);
+}
+
+.map-key--safe::before {
+  background: var(--safe);
+}
+
+.map-key--caution::before {
+  background: var(--caution);
+}
+
+.map-key--refused::before {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--refused) 0 1.5px,
+    var(--refused-wash) 1.5px 4px
+  );
+}
+
 .map-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;

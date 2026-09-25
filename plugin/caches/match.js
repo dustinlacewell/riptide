@@ -25,7 +25,7 @@ import { MATCHERS, matcherFor } from "./matchers/index.js";
  * @param {{env: object, drives: string[], scope: string|null}} ctx scope is
  *        lowercased with no trailing separator
  * @returns {{hits: Array<{entry: object, record: object, path: string}>,
- *            refused: Array<{path: string, reason: string}>}}
+ *            refused: Array<{path: string, reason: string, record: object}>}}
  */
 export function matchTree(tree, entries, ctx) {
   const located = locate(tree, entries, ctx);
@@ -121,7 +121,8 @@ function screen(hits) {
   for (const hit of hits) {
     const result = screenPaths([hit.path], { requireDepth: hit.wild === true });
     if (result.refused.length > 0) {
-      refused.push(...result.refused);
+      // The record goes with the refusal so a caller can mark the folder.
+      refused.push(...result.refused.map((r) => ({ ...r, record: hit.record })));
       continue;
     }
     hitsOut.push({ entry: hit.rule, record: hit.record, path: hit.path });

@@ -105,9 +105,13 @@ export async function cacheConfigs() {
   return res.json();
 }
 
-/** Read a whole drive into a space map. Resolves with the snapshot's name. */
-export function mapRead({ root }, onProgress, signal) {
-  return streamNdjson("/map/read", { root }, onProgress, signal);
+/**
+ * Read a whole drive into a space map. patterns and disabled are the Zap
+ * and Caches tabs' settings, which decide what the map marks as junk.
+ * Resolves with the snapshot's name.
+ */
+export function mapRead({ root, patterns, disabled }, onProgress, signal) {
+  return streamNdjson("/map/read", { root, patterns, disabled }, onProgress, signal);
 }
 
 /**

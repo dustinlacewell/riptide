@@ -6,7 +6,8 @@ import { useStoppable } from "./useStoppable.js";
 /**
  * The space map's data: one drive read, and the page on show.
  *
- *   read(root)   read root's drive; shows root's folder when it is done
+ *   read(root, {patterns, disabled})
+ *                read root's drive; shows root's folder when it is done
  *   show(id)     show a folder of the current map
  *   prefetch(id) fetch a folder's page ahead of a click
  *   refresh()    show the current folder again, after a delete
@@ -83,13 +84,13 @@ export function useSpaceMap() {
   }, [page, show]);
 
   const read = useCallback(
-    async (root) => {
+    async (root, { patterns, disabled } = {}) => {
       const signal = run.begin();
       setReading(true);
       setError(null);
       telemetry.start();
       try {
-        const done = await api.mapRead({ root }, telemetry.note, signal);
+        const done = await api.mapRead({ root, patterns, disabled }, telemetry.note, signal);
         if (done.failure) {
           telemetry.reset();
           setError(done.failure);

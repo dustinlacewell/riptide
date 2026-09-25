@@ -90,13 +90,26 @@ test("read: a completed read publishes and reports the root", async () => {
     usedSpace: async () => 1000,
     onProgress: (n) => stages.push(n.stage),
   });
-  assert.deepEqual(stages, ["boot", "compact"]);
+  assert.deepEqual(stages, ["boot", "junk", "compact"]);
   assert.equal(result.drive, "C:");
   assert.equal(store.get("C:").gen, result.gen);
   assert.ok(result.rootId > 0);
   assert.equal(result.stats.rootBytes, 15);
   assert.equal(result.stats.volumeUsed, 1000);
   assert.equal(result.stats.records, 200);
+});
+
+test("read: name patterns mark junk before the snapshot is published", async () => {
+  const store = createMapStore();
+  const result = await readMap({
+    drive: "C:",
+    store,
+    patterns: ["node_modules"],
+    readTree: stubRead(tree(40)),
+    usedSpace: noSpace,
+  });
+  assert.equal(result.stats.junkBytes, 40);
+  assert.equal(store.get("C:").snap.junkBytes[0], 40);
 });
 
 test("read: a stopped read keeps the previous snapshot", async () => {
