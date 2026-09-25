@@ -13,6 +13,7 @@ import {
   junkShare,
   layoutPage,
   selectable,
+  tileAt,
   tileClass,
   toneOf,
 } from "./mapView.js";
@@ -106,6 +107,20 @@ test("select: refused, locked and non-folder tiles cannot be picked", () => {
   assert.equal(selectable({ kind: "folder", junk: "refused" }), false);
   assert.equal(selectable({ kind: "folder", locked: "too close to drive root" }), false);
   assert.equal(selectable({ kind: "other" }), false);
+});
+
+test("tileAt: the deepest tile under the point wins, gaps fall to the parent", () => {
+  const parent = { key: "p", x: 0, y: 0, w: 100, h: 100 };
+  const child = { key: "c", x: 10, y: 20, w: 30, h: 30 };
+  const other = { key: "o", x: 100, y: 0, w: 50, h: 100 };
+  // The child is listed after its parent, as layoutPage lists them; order
+  // must not matter.
+  for (const tiles of [[parent, child, other], [child, parent, other]]) {
+    assert.equal(tileAt(tiles, 15, 25)?.key, "c");
+    assert.equal(tileAt(tiles, 5, 5)?.key, "p");
+    assert.equal(tileAt(tiles, 100, 50)?.key, "o");
+    assert.equal(tileAt(tiles, 150, 50), null);
+  }
 });
 
 test("class: tone, depth, lock and selection", () => {

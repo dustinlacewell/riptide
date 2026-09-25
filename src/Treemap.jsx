@@ -7,6 +7,7 @@ import {
   junkShare,
   layoutPage,
   selectable,
+  tileAt,
   tileClass,
   toneOf,
 } from "./mapView.js";
@@ -22,6 +23,10 @@ const STRIP = 3;
  * ranked list beside the map carries the same actions for the keyboard and
  * for screen readers, so the drawing itself is hidden from them.
  *
+ * The tiles take no pointer events. The drawing reads the pointer itself and
+ * asks tileAt which tile lies under it, so a nested tile always wins over
+ * the parent behind it, whatever the stacking or any scaling of the page.
+ *
  * @param {{page: object, extras?: object[], selected: Set<number>,
  *          hoverId: number|null, onHover: (tile: object|null) => void,
  *          onOpen: (tile: object) => void, onToggle?: (tile: object) => void}} props
@@ -35,7 +40,23 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
     [page, extras, width, height],
   );
 
-  const click = (tile, e) => {
+  const hovered = tiles.find((t) => t.id !== undefined && t.id === hoverId);
+
+  const under = (e) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - box.left) * width) / box.width;
+    const y = ((e.clientY - box.top) * height) / box.height;
+    return tileAt(tiles, x, y);
+  };
+
+  const move = (e) => {
+    const tile = under(e);
+    if ((tile?.id ?? null) !== (hoverId ?? null)) onHover(tile);
+  };
+
+  const click = (e) => {
+    const tile = under(e);
+    if (!tile) return;
     if ((e.ctrlKey || e.metaKey || e.shiftKey) && onToggle) {
       if (selectable(tile)) onToggle(tile);
       return;
@@ -44,9 +65,18 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
   };
 
   return (
-    <div className="treemap" ref={ref} onPointerLeave={() => onHover(null)}>
+    <div className="treemap" ref={ref}>
       {width > 0 && (
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          aria-hidden="true"
+          className={hovered && drillable(hovered) ? "is-drillable" : undefined}
+          onPointerMove={move}
+          onPointerLeave={() => onHover(null)}
+          onClick={click}
+        >
           <defs>
             <pattern id="map-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <line className="map-hatch-line" x1="0" y1="0" x2="0" y2="6" />
@@ -57,9 +87,7 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
               key={tile.key}
               tile={tile}
               selected={tile.id !== undefined && selected.has(tile.id)}
-              hovered={tile.id !== undefined && tile.id === hoverId}
-              onEnter={() => onHover(tile)}
-              onClick={(e) => click(tile, e)}
+              hovered={tile === hovered}
             />
           ))}
         </svg>
@@ -68,24 +96,14 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
   );
 }
 
-function Tile({ tile, selected, hovered, onEnter, onClick }) {
+function Tile({ tile, selected, hovered }) {
   const share = junkShare(tile);
   const strip = share.safe + share.caution > 0 && tile.h > STRIP * 3;
   const stripY = tile.y + tile.h - STRIP;
   const labelY = tile.y + 13;
 
   return (
-    <g
-      className={`${tileClass(tile, { selected })}${hovered ? " is-hovered" : ""}${drillable(tile) ? " is-drillable" : ""}`}
-      onPointerEnter={(e) => {
-        e.stopPropagation();
-        onEnter();
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e);
-      }}
-    >
+    <g className={`${tileClass(tile, { selected })}${hovered ? " is-hovered" : ""}`}>
       <rect className="map-tile-fill" x={tile.x} y={tile.y} width={tile.w} height={tile.h} />
       {tile.nested && (
         <rect className="map-tile-head" x={tile.x} y={tile.y} width={tile.w} height={HEADER} />
@@ -121,7 +139,6 @@ function Tile({ tile, selected, hovered, onEnter, onClick }) {
           )}
         </text>
       )}
-      <title>{`${tile.name} · ${bytes(tile.bytes)}`}</title>
     </g>
   );
 }

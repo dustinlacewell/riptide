@@ -70,6 +70,22 @@ export function tileClass(tile, { selected = false } = {}) {
   return parts.join(" ");
 }
 
+/**
+ * The tile under a point: the smallest one that holds it. Tiles nest, so
+ * the smallest is the deepest — a child wins over the parent drawn behind it.
+ *
+ * @param {object[]} tiles from layoutPage
+ * @returns {object|null}
+ */
+export function tileAt(tiles, x, y) {
+  let best = null;
+  for (const t of tiles) {
+    if (x < t.x || y < t.y || x >= t.x + t.w || y >= t.y + t.h) continue;
+    if (!best || t.w * t.h < best.w * best.h) best = t;
+  }
+  return best;
+}
+
 /** Can the tile be picked for deletion? The server checks again. */
 export function selectable(tile) {
   return tile.kind === "folder" && !tile.locked && tile.junk !== "refused";

@@ -1830,7 +1830,12 @@ button.row.up .row-name {
   opacity: 0.7;
 }
 
-.map-tile.is-drillable {
+/* The drawing hit-tests the pointer itself (tileAt); no tile takes it. */
+.treemap .map-tile {
+  pointer-events: none;
+}
+
+.treemap svg.is-drillable {
   cursor: pointer;
 }
 
