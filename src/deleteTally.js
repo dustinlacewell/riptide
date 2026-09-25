@@ -23,7 +23,15 @@ export function startRun({ paths, sizes, permanent, t, actions = [] }) {
   return {
     permanent,
     sizes,
-    actions: actions.map(({ id, label }) => ({ id, label, status: "waiting", line: null, error: null })),
+    actions: actions.map(({ id, label }) => ({
+      id,
+      label,
+      status: "waiting",
+      line: null,
+      error: null,
+      step: null,
+      critical: false,
+    })),
     total: paths.length,
     done: 0,
     deleted: 0,
@@ -60,16 +68,33 @@ export function applyDeleteNote(run, note) {
 }
 
 /**
- * One action note: {id, status: "running"|"ok"|"failed", error?} or
- * {id, line}. The run keeps only each action's latest line.
+ * One action note: {id, status: "running"|"ok"|"failed", error?},
+ * {id, step, critical} as a step starts, or {id, line}. The run keeps only
+ * each action's latest line, and whether its current step is critical.
  */
 export function applyActionNote(run, note) {
   const actions = run.actions.map((a) => {
     if (a.id !== note.id) return a;
     if (typeof note.line === "string") return { ...a, line: note.line };
-    return { ...a, status: note.status ?? a.status, error: note.error ?? null };
+    if (typeof note.step === "string") {
+      return { ...a, step: note.step, critical: note.critical === true };
+    }
+    const status = note.status ?? a.status;
+    const over = status === "ok" || status === "failed";
+    return { ...a, status, error: note.error ?? null, critical: over ? false : a.critical };
   });
   return { ...run, actions };
+}
+
+/**
+ * The step that must not be cut short, while one runs: closing the page
+ * would stop the run around it.
+ *
+ * @returns {string|null} the step's text, or null
+ */
+export function criticalStep(run) {
+  const a = run?.actions?.find((x) => x.status === "running" && x.critical);
+  return a ? a.step : null;
 }
 
 /** A wiped row has left the table. */

@@ -210,6 +210,7 @@ test("wsl: shutdown first, then diskpart per disk, commands on stdin", async (t)
     disks.push(disk);
     assert.equal(step.stdin, compactScript(disk));
     assert.ok(step.failPattern.test("Virtual Disk Service error:"));
+    assert.equal(step.critical, true);
   }
   assert.deepEqual(disks.sort(), [distro, docker].sort());
 });
@@ -235,7 +236,9 @@ test("wsl: a failed, killed or timed-out compact is followed by a detach", async
   // A hang past the timeout: killed, then detached.
   let spawned = 0;
   const hanging = createFakeSpawn(() => (spawned++ === 0 ? { hang: true } : { code: 0 }));
-  const timed = await runStep({ ...compact, timeoutMs: 10 }, { spawn: hanging.spawn });
+  // A compact is critical and never timed out by us; a kill from outside
+  // looks the same to the cleanup, so the timeout stands in for it here.
+  const timed = await runStep({ ...compact, critical: false, timeoutMs: 10 }, { spawn: hanging.spawn });
   assert.match(timed.error, /timed out/);
   assert.equal(hanging.calls[0].killed, true);
   assert.equal(hanging.calls[1].stdin, detachScript(disk));

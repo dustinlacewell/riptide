@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import {
   applyActionNote,
   applyDeleteNote,
+  criticalStep,
   fateClass,
   fateOf,
   finishRun,
@@ -120,8 +121,22 @@ test("actions: each keeps its status and only its latest line", () => {
   run = applyActionNote(run, { id: "b", status: "ok" });
 
   assert.deepEqual(run.actions, [
-    { id: "a", label: "A", status: "failed", line: "two", error: "exit code 1" },
-    { id: "b", label: "B", status: "ok", line: null, error: null },
+    { id: "a", label: "A", status: "failed", line: "two", error: "exit code 1", step: null, critical: false },
+    { id: "b", label: "B", status: "ok", line: null, error: null, step: null, critical: false },
   ]);
   assert.equal(run.freed, "0", "an action adds nothing to freed");
+});
+
+test("actions: a critical step is reported while it runs, and not after", () => {
+  let run = startRun({ paths: [], sizes: new Map(), permanent: false, t: 0, actions: [{ id: "w", label: "W" }] });
+  run = applyActionNote(run, { id: "w", status: "running" });
+  run = applyActionNote(run, { id: "w", step: "wsl --shutdown", critical: false });
+  assert.equal(criticalStep(run), null);
+  run = applyActionNote(run, { id: "w", step: "diskpart: compact C:\\x.vhdx", critical: true });
+  assert.equal(criticalStep(run), "diskpart: compact C:\\x.vhdx");
+  run = applyActionNote(run, { id: "w", line: "100 percent completed" });
+  assert.equal(criticalStep(run), "diskpart: compact C:\\x.vhdx");
+  run = applyActionNote(run, { id: "w", status: "ok" });
+  assert.equal(criticalStep(run), null);
+  assert.equal(criticalStep(null), null);
 });

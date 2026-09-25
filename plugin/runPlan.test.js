@@ -66,9 +66,11 @@ test("runPlan: paths first, then actions in order, with their output", async () 
     notes.filter((n) => n.type === "action"),
     [
       { type: "action", id: "b", status: "running" },
+      { type: "action", id: "b", step: "b", critical: false },
       { type: "action", id: "b", line: "pruned 3" },
       { type: "action", id: "b", status: "ok" },
       { type: "action", id: "a", status: "running" },
+      { type: "action", id: "a", step: "a x", critical: false },
       { type: "action", id: "a", status: "ok" },
     ],
   );

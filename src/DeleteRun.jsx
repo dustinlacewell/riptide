@@ -1,5 +1,7 @@
-import { runReceiptLine } from "./deleteTally.js";
+import { criticalStep, runReceiptLine } from "./deleteTally.js";
 import { bytesParts, unitOf } from "./format.js";
+import { useLeaveGuard } from "./useLeaveGuard.js";
+import Callout from "./ui/Callout.jsx";
 import Glyph from "./ui/Glyph.jsx";
 import Meter from "./ui/Meter.jsx";
 import Stat from "./ui/Stat.jsx";
@@ -15,6 +17,10 @@ import { useTween } from "./ui/useTween.js";
  *   run is the state from deleteTally.js
  */
 export default function DeleteRun({ run, noun }) {
+  // Closing the page would stop the run; a critical step must not be cut.
+  const critical = criticalStep(run);
+  useLeaveGuard(critical !== null);
+
   if (!run) return null;
   if (run.receipt) return <Receipt run={run} noun={noun} />;
 
@@ -22,6 +28,9 @@ export default function DeleteRun({ run, noun }) {
   return (
     <section className="delete-run" aria-label="Delete progress">
       <span className="delete-title">{titleOf(run)}</span>
+      {critical && (
+        <Callout tone="caution">Don&apos;t close this page — {critical} is running.</Callout>
+      )}
       {hasPaths && (
         <>
           <Meter

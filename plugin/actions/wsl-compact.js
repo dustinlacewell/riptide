@@ -62,6 +62,8 @@ export default {
         label: `diskpart: compact ${disk}`,
         stdin: compactScript(disk),
         failPattern: DISKPART_ERROR,
+        // Killing a compact midway can damage the disk.
+        critical: true,
         // diskpart on stdin runs past an error, but a kill or a timeout
         // stops it with the disk still attached.
         cleanup: {

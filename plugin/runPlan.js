@@ -10,6 +10,7 @@
  *
  *   {type: "progress", path, ok, error?, done, total}   one per path
  *   {type: "action", id, status: "running"}
+ *   {type: "action", id, step, critical}               a step starts
  *   {type: "action", id, line}                         output
  *   {type: "action", id, status: "ok"|"failed", error?}
  *
@@ -57,6 +58,7 @@ async function runOne(id, { signal, write, runAction, actionFor, ctx }) {
   const result = await runAction(action, ctx, {
     signal,
     onLine: ({ line }) => write({ type: "action", id, line }),
+    onStep: ({ label, critical }) => write({ type: "action", id, step: label, critical }),
   });
   write({
     type: "action",

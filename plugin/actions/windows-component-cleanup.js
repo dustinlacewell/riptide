@@ -30,6 +30,8 @@ export default {
         exe: dismPath(ctx.env),
         args: ["/Online", "/Cleanup-Image", "/StartComponentCleanup"],
         timeoutMs: TIMEOUT_MS,
+        // Killing DISM midway can leave the component store damaged.
+        critical: true,
       },
     ];
   },

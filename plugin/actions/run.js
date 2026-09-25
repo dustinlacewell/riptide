@@ -8,6 +8,9 @@
  *   failPattern  an output line matching it fails the step whatever the
  *                exit code. diskpart reading stdin reports an error in its
  *                output and still exits 0.
+ *   critical     once started, the step runs to the end: no abort and no
+ *                timeout kills it. Killing DISM or diskpart midway can
+ *                leave the system or a disk in a bad state.
  *   cleanup      a step run after this one fails for any reason: error,
  *                kill, timeout. It runs even after an abort. Its outcome
  *                does not change the failure reported.
@@ -23,10 +26,12 @@ import path from "node:path";
  * @param {{id: string, steps: (ctx: object) => Promise<object[]>}} action
  * @param {{spawn: Function}} ctx
  * @param {{onLine?: (note: {id: string, line: string}) => void,
+ *          onStep?: (note: {id: string, label: string, critical: boolean}) => void,
  *          signal?: AbortSignal}} [opts]
+ *   onStep fires as each step starts
  * @returns {Promise<{id: string, ok: boolean, error?: string}>}
  */
-export async function runAction(action, ctx, { onLine = () => {}, signal } = {}) {
+export async function runAction(action, ctx, { onLine = () => {}, onStep = () => {}, signal } = {}) {
   let steps;
   try {
     steps = await action.steps(ctx);
@@ -35,6 +40,9 @@ export async function runAction(action, ctx, { onLine = () => {}, signal } = {})
   }
 
   for (const step of steps) {
+    if (!signal?.aborted) {
+      onStep({ id: action.id, label: commandText(step), critical: step.critical === true });
+    }
     const result = await runStep(step, {
       spawn: ctx.spawn,
       onLine: (line) => onLine({ id: action.id, line }),
@@ -155,11 +163,11 @@ function spawnStep(step, { spawn, onLine, signal }) {
     };
     const onAbort = () => kill("stopped");
 
-    const timer = setTimeout(
-      () => kill(`timed out after ${formatMs(step.timeoutMs)}`),
-      step.timeoutMs,
-    );
-    signal?.addEventListener("abort", onAbort, { once: true });
+    // A critical step is left to finish, whatever happens around it.
+    const timer = step.critical
+      ? null
+      : setTimeout(() => kill(`timed out after ${formatMs(step.timeoutMs)}`), step.timeoutMs);
+    if (!step.critical) signal?.addEventListener("abort", onAbort, { once: true });
 
     // A child that exits before reading all of it closes the pipe; that is
     // its exit code's story, not an error here.

@@ -111,6 +111,53 @@ test("run: an abort kills the running child and skips later steps", async () => 
   assert.equal(fake.calls[0].killed, true);
 });
 
+test("run: an abort during a critical step does not kill it; later steps do not start", async () => {
+  let release;
+  const fake = createFakeSpawn(() => ({ hang: true }));
+  // The fake's hanging child closes only when killed; give it an exit.
+  const spawn = (exe, args) => {
+    const child = fake.spawn(exe, args);
+    release = () => child.emit("close", 0);
+    return child;
+  };
+  const controller = new AbortController();
+  const steps = [];
+  const pending = runAction(
+    action([
+      { exe: "C:\\dism.exe", args: [], timeoutMs: 5, critical: true },
+      { exe: "C:\\b.exe", args: [], timeoutMs: 60_000 },
+    ]),
+    { spawn },
+    { signal: controller.signal, onStep: (s) => steps.push(s) },
+  );
+  setTimeout(() => controller.abort(), 10);
+  // Past both the abort and the 5 ms timeout.
+  setTimeout(() => release(), 40);
+  const result = await pending;
+
+  assert.equal(fake.calls[0].killed, false, "a critical step is never killed");
+  assert.equal(fake.calls.length, 1, "nothing starts after the abort");
+  assert.deepEqual(result, { id: "demo", ok: false, error: "stopped" });
+  assert.deepEqual(steps, [{ id: "demo", label: "dism", critical: true }]);
+});
+
+test("run: an abort during a normal step still kills it", async () => {
+  const fake = createFakeSpawn(() => ({ hang: true }));
+  const controller = new AbortController();
+  const pending = runStep(
+    { exe: "C:\\a.exe", args: [], timeoutMs: 60_000, critical: false },
+    { spawn: fake.spawn, signal: controller.signal },
+  );
+  setTimeout(() => controller.abort(), 5);
+  assert.deepEqual(await pending, { ok: false, code: null, error: "stopped" });
+  assert.equal(fake.calls[0].killed, true);
+});
+
+test("run: dism and diskpart compact steps are critical", async () => {
+  const dism = await actionFor("windows-component-cleanup").steps({ env: { SystemRoot: "C:\\Windows" } });
+  assert.equal(dism[0].critical, true);
+});
+
 test("run: an already-aborted signal spawns nothing", async () => {
   const fake = createFakeSpawn();
   const controller = new AbortController();
