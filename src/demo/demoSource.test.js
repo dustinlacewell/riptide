@@ -55,16 +55,16 @@ test("scan: the telemetry reducer walks read, index, size and reaches done", asy
   assert.equal(end.receipt.how, "full");
 });
 
-test("scan: about forty hits, ~18.6 GB, sized and dated like the server's", async () => {
+test("scan: two dozen hits, ~14.7 GB, sized and dated like the server's", async () => {
   const { done } = await scan(demo());
   const hits = done.hits;
-  assert.ok(hits.length >= 38 && hits.length <= 42, `${hits.length} hits`);
+  assert.equal(hits.length, 24);
 
   const outside = hits.filter((h) => !h.path.startsWith(CODE));
   assert.deepEqual(outside.map((h) => h.path), ["C:\\Windows\\SystemApps\\WebExperience\\node_modules"]);
 
   const total = hits.filter((h) => h.path.startsWith(CODE)).reduce((s, h) => s + Number(h.bytes), 0);
-  assert.ok(Math.abs(total / GB - 18.6) < 0.2, `${(total / GB).toFixed(2)} GB`);
+  assert.ok(Math.abs(total / GB - 14.7) < 0.2, `${(total / GB).toFixed(2)} GB`);
 
   for (const h of hits) {
     assert.equal(typeof h.bytes, "string");
@@ -74,6 +74,15 @@ test("scan: about forty hits, ~18.6 GB, sized and dated like the server's", asyn
   const ages = hits.map((h) => (NOW - h.mtime) / DAY);
   assert.equal(Math.min(...ages), 2);
   assert.ok(Math.max(...ages) >= 3 * 365 - 1);
+});
+
+// The site's demo window shows the default scan's rows without scrolling.
+test("scan: the default pattern finds eight folders, one of them refused", async () => {
+  const { done } = await telemetryOf((onProgress) =>
+    demo().scan({ root: HOME, patterns: "node_modules", onProgress }),
+  );
+  assert.equal(done.hits.length, 8);
+  assert.equal(done.hits.filter((h) => h.path.startsWith("C:\\Windows")).length, 1);
 });
 
 test("scan: only the typed folder names match", async () => {
@@ -158,13 +167,14 @@ async function cachesOf(src, disabled = []) {
   return { ...run, found, actions };
 }
 
-test("caches: two found batches group into twelve-ish rules over four packs", async () => {
+// Eight rows: what the site's demo window shows without scrolling.
+test("caches: two found batches group into eight rows over four packs", async () => {
   const { found, actions, state } = await cachesOf(demo());
   assert.equal(found.length, 2);
   assert.equal(state.phase, "size");
 
   const groups = groupHits(found.flat());
-  assert.equal(groups.length + actions.length, 12);
+  assert.equal(groups.length + actions.length, 8);
   assert.equal(new Set(found.flat().map((h) => h.pack)).size, 4);
 
   const caution = groups.filter((g) => riskOf(g) === "caution");

@@ -12,6 +12,7 @@ export const caps = {
   leaveGuard: true,
   permanent: true,
   fullRescan: true,
+  window: false,
 };
 
 export async function getRoots() {

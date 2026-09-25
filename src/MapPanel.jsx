@@ -12,6 +12,7 @@ import ReclaimPanel from "./ReclaimPanel.jsx";
 import { reclaimOf } from "./reclaim.js";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
+import { useCaps } from "./source/context.js";
 import Treemap from "./Treemap.jsx";
 import { useSpaceMap } from "./useSpaceMap.js";
 import { useZapFlow } from "./useZapFlow.js";
@@ -29,9 +30,9 @@ const PREFETCH = 3;
 export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots, prefs, onBusy }) {
   const space = useSpaceMap();
   const { page, map } = space;
+  const fill = useCaps().window === true;
   const [hoverId, setHoverId] = useState(null);
   const prefetched = useRef(null);
-
 
   const open = useCallback((row) => space.show(row.id), [space]);
 
@@ -193,6 +194,7 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
             <Treemap
               page={page}
               extras={extras}
+              fill={fill}
               selected={selected}
               hoverId={hoverId}
               onHover={onHover}

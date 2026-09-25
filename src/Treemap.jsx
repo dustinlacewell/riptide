@@ -11,7 +11,7 @@ import {
   tileClass,
   toneOf,
 } from "./mapView.js";
-import { useWidth } from "./ui/useWidth.js";
+import { useSize } from "./ui/useSize.js";
 
 const STRIP = 3;
 
@@ -27,16 +27,20 @@ const STRIP = 3;
  * asks tileAt which tile lies under it, so a nested tile always wins over
  * the parent behind it, whatever the stacking or any scaling of the page.
  *
- * @param {{page: object, extras?: object[], selected: Set<number>,
+ * By default the drawing's height follows its width. With `fill` it takes
+ * the height of the box the layout gives it, for a fixed-size window.
+ *
+ * @param {{page: object, extras?: object[], fill?: boolean, selected: Set<number>,
  *          hoverId: number|null, onHover: (tile: object|null) => void,
  *          onOpen: (tile: object) => void, onToggle?: (tile: object) => void}} props
  */
-export default function Treemap({ page, extras, selected, hoverId, onHover, onOpen, onToggle }) {
-  const [ref, width] = useWidth();
-  const height = Math.round(Math.min(640, Math.max(320, width * 0.62)));
+export default function Treemap({ page, extras, fill = false, selected, hoverId, onHover, onOpen, onToggle }) {
+  const [ref, size] = useSize();
+  const { width } = size;
+  const height = fill ? size.height : heightFor(width);
 
   const tiles = useMemo(
-    () => (width > 0 ? layoutPage(page, { x: 0, y: 0, w: width, h: height }, { extras }) : []),
+    () => (width > 0 && height > 0 ? layoutPage(page, { x: 0, y: 0, w: width, h: height }, { extras }) : []),
     [page, extras, width, height],
   );
 
@@ -66,7 +70,7 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
 
   return (
     <div className="treemap" ref={ref}>
-      {width > 0 && (
+      {width > 0 && height > 0 && (
         <svg
           width={width}
           height={height}
@@ -94,6 +98,11 @@ export default function Treemap({ page, extras, selected, hoverId, onHover, onOp
       )}
     </div>
   );
+}
+
+/** A height that keeps the drawing's shape as the page grows wider. */
+function heightFor(width) {
+  return Math.round(Math.min(640, Math.max(320, width * 0.62)));
 }
 
 function Tile({ tile, selected, hovered }) {

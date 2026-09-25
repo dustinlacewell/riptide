@@ -18,7 +18,8 @@ import Demo from "./Demo.jsx";
     <a class="cta" href="#get">Get riptide</a>
   </div>
 
-  <!-- The app needs about 900 px. Narrower screens get the figure instead.
+  <!-- The app window scales down to about 900 px. Narrower screens get the
+       figure instead.
        The app renders only in the browser; Astro shows the fallback figure
        until it mounts. -->
   <div class="stage wide">
@@ -93,18 +94,21 @@ import Demo from "./Demo.jsx";
     filter: brightness(1.08);
   }
 
-  /* Wider than the text column: the app is the point of the page. */
+  /* Wider than the text column: the app is the point of the page. At full
+     width the app window (Demo.jsx, 1200 px) fills it exactly; narrower,
+     the window scales down. */
   .stage {
     width: 100%;
-    max-width: 1280px;
+    max-width: calc(1200px + 2 * var(--gutter));
     margin: 0 auto;
     padding: 0 var(--gutter);
   }
 
-  /* The app grows with its content and scrolls with the page. */
+  /* A fixed-size window: it never grows with its content. */
   .stage :global(.demo-app) {
     border: 1px solid var(--line);
     border-radius: var(--r-md);
+    overflow: hidden;
   }
 
   .narrow {

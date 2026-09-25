@@ -6,7 +6,11 @@ import { createContext, createElement, useContext } from "react";
  *
  * A source has the functions httpSource.js exports, plus `caps` — what this
  * source can do, so the UI hides controls it cannot back:
- *   {demo, directoryPicker, settings, leaveGuard, permanent, fullRescan}
+ *   {demo, directoryPicker, settings, leaveGuard, permanent, fullRescan, window}
+ *
+ * `window` means the app sits in a fixed-size frame (the site's demo): the
+ * host gives its .rt-app the is-window class, and only the results region
+ * scrolls.
  */
 const SourceContext = createContext(null);
 

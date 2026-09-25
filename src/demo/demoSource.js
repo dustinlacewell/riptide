@@ -35,6 +35,7 @@ export const caps = {
   leaveGuard: false,
   permanent: false,
   fullRescan: false,
+  window: true,
 };
 
 export function createDemoSource({ clock = Date.now, sleep = realSleep } = {}) {

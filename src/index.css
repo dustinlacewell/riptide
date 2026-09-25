@@ -1951,6 +1951,96 @@ button.row.up .row-name {
   color: var(--dim);
 }
 
+/* --- window -------------------------------------------------------------- */
+
+/* A fixed-size frame (caps.window; the site's demo). The host sets its size.
+   The header, tab head and controls hold still; only the results region
+   under them scrolls, and only when a click grows it past the frame. */
+
+:scope.is-window {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+:scope.is-window > .app-header {
+  flex: none;
+}
+
+:scope.is-window > .app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--s-4);
+}
+
+:scope.is-window .tab-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  margin-top: 0;
+}
+
+:scope.is-window .tab-panel[hidden] {
+  display: none;
+}
+
+:scope.is-window .tab-panel > * {
+  flex: none;
+}
+
+:scope.is-window .tab-panel > * + * {
+  margin-top: var(--s-3);
+}
+
+:scope.is-window .tab-panel > :is(.results, .map, .file-results) {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The region scrolls, so the side panel sticks to its top edge. */
+:scope.is-window .results .reclaim {
+  top: 0;
+}
+
+:scope.is-window .hits td {
+  height: 36px;
+}
+
+/* The map takes the height left; the side column scrolls on its own. */
+:scope.is-window .map-body {
+  flex: 1 1 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+:scope.is-window .treemap {
+  align-self: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+:scope.is-window .map-side {
+  align-self: stretch;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The frame has a transform, so a fixed backdrop covers the frame, not the
+   page. The dialog stays inside it. */
+:scope.is-window .backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:scope.is-window .dialog {
+  max-height: 100%;
+}
+
 } /* @scope (.rt-app) */
 
 @keyframes hint-pulse {

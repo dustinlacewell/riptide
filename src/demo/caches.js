@@ -20,7 +20,7 @@ const RULES = {
     tool: "cargo",
     pack: "rust",
     cost: "Crates re-downloaded on the next build.",
-    riskNote: "Holds unpacked crate sources as well as archives. Safe to delete, but a cold rebuild after is slow.",
+    riskNote: "Holds crate sources too. A cold rebuild after is slow.",
   },
   "cargo-git": { label: "Cargo git checkouts", tool: "cargo", pack: "rust", cost: "Re-cloned on the next build." },
   "jetbrains-caches": { label: "JetBrains caches", tool: "jetbrains", pack: "tools", cost: "Rebuilt when the IDE re-indexes." },
@@ -35,12 +35,8 @@ export const FOUND_BATCHES = [
   [
     ["npm-cache", `${LOCAL}\\npm-cache`, 3400, 61000],
     ["pnpm-store", `${LOCAL}\\pnpm\\store`, 5200, 240000],
-    ["yarn-cache", `${LOCAL}\\Yarn\\Cache`, 900, 12000],
-    ["playwright-browsers", `${LOCAL}\\ms-playwright`, 1100, 9000],
     ["pip-cache", `${LOCAL}\\pip\\cache`, 1200, 8800],
-    ["uv-cache", `${LOCAL}\\uv\\cache`, 2300, 31000],
     ["cargo-registry", `${HOME}\\.cargo\\registry`, 2100, 52000],
-    ["cargo-git", `${HOME}\\.cargo\\git`, 340, 4000],
     ["jetbrains-caches", `${LOCAL}\\JetBrains`, 2900, 30000],
   ],
   [
