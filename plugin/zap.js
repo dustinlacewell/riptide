@@ -33,6 +33,14 @@ export function screenPaths(paths, { requireDepth = true } = {}) {
   for (const raw of paths) {
     const full = path.resolve(raw);
 
+    // Runs first: the protected-path rules compare names, and Windows would
+    // read "C:\Windows." as C:\Windows.
+    const unsafe = unsafeName(full);
+    if (unsafe) {
+      refused.push({ path: full, reason: unsafe });
+      continue;
+    }
+
     // A pattern typo or a crafted request must not reach a drive root or a
     // system folder, whatever the UI asked for.
     const protection = protectionOf(full);
@@ -62,6 +70,25 @@ export function screenPaths(paths, { requireDepth = true } = {}) {
   }
 
   return { allowed, refused };
+}
+
+/**
+ * Names that do not reach the folder they spell.
+ *
+ * Win32 strips a trailing "." or " " from a name, so the Shell would
+ * recycle C:\a\keep when asked for C:\a\keep. — a different folder. An 8.3
+ * short name (PROGRA~1) is an alias the protected-path rules cannot see
+ * through.
+ *
+ * @param {string} full an absolute, resolved path
+ * @returns {string|null} why the path is refused, or null when it is not
+ */
+function unsafeName(full) {
+  const { root } = path.win32.parse(full);
+  const segments = full.slice(root.length).split("\\").filter(Boolean);
+  if (segments.some((s) => /[. ]$/.test(s))) return "name Windows can't address safely";
+  if (segments.some((s) => /~\d/.test(s))) return "short name";
+  return null;
 }
 
 /**

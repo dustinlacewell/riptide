@@ -8,7 +8,51 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { screenPaths } from "./zap.js";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { screenPaths, zapPaths } from "./zap.js";
+
+test("screen: refuses names Windows strips or aliases", () => {
+  const cases = {
+    "C:\\Users\\dustin\\a\\keep.": "name Windows can't address safely",
+    "C:\\Users\\dustin\\a\\keep ": "name Windows can't address safely",
+    "C:\\Users\\dustin\\a.\\b": "name Windows can't address safely",
+    "C:\\Windows.\\Temp": "name Windows can't address safely",
+    "C:\\PROGRA~1\\x": "short name",
+    "C:\\Users\\DUSTIN~1\\a\\b": "short name",
+  };
+  const { allowed, refused } = screenPaths(Object.keys(cases));
+  assert.deepEqual(allowed, []);
+  for (const r of refused) assert.equal(r.reason, cases[r.path], r.path);
+});
+
+test("screen: dots, spaces and tildes inside a name are fine", () => {
+  const paths = [
+    "C:\\Users\\dustin\\a\\keep.txt",
+    "C:\\Users\\dustin\\a\\a~b",
+    "C:\\Users\\dustin\\a\\x~",
+    "C:\\Users\\dustin\\my folder\\.cache",
+  ];
+  assert.deepEqual(screenPaths(paths).allowed, paths);
+});
+
+test("screen: a real temp folder screens through and deletes", async () => {
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "riptide-zap-"));
+  const target = path.join(dir, "node_modules");
+  fs.mkdirSync(path.join(target, "pkg"), { recursive: true });
+  try {
+    const { allowed, refused } = screenPaths([target, `${target}.`]);
+    assert.deepEqual(allowed, [target]);
+    assert.equal(refused[0].reason, "name Windows can't address safely");
+    const [result] = await zapPaths(allowed, { permanent: true });
+    assert.equal(result.ok, true);
+    assert.equal(fs.existsSync(target), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("screen: allows an ordinary project folder", () => {
   const { allowed, refused } = screenPaths(["C:\\Users\\dustin\\proj\\node_modules"]);
