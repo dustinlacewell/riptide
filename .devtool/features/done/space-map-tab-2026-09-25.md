@@ -1,12 +1,12 @@
 ---
 id: "space-map-tab-2026-09-25"
-status: "todo"
+status: "done"
 priority: "high"
 assignee: null
 dueDate: null
 created: "2026-09-25T00:00:00.000Z"
-modified: "2026-09-25T00:00:00.000Z"
-completedAt: null
+modified: "2026-09-25T07:09:41.678Z"
+completedAt: "2026-09-25T07:09:41.678Z"
 labels: []
 order: "a0"
 ---
