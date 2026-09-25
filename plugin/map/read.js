@@ -104,6 +104,11 @@ async function readAndPublish(opts, signal) {
   // The cache filters ask about files (a Cargo.toml beside a target), and
   // files are dropped as the MFT streams; the query keeps what they need.
   const query = buildNameQuery(collectNeeds(opts.entries));
+  const used = await usedSpace(drive);
+  signal.throwIfAborted();
+  // The last await. From the tree to the publish nothing yields, so the
+  // snapshot carries the version of the tree it was built from and no
+  // newer rebuild can land in between (rebuildMap).
   const volume = await readTree(drive, { query, onProgress, signal });
   signal.throwIfAborted();
 
@@ -117,9 +122,6 @@ async function readAndPublish(opts, signal) {
   onProgress({ stage: "compact" });
   const snap = buildSnapshot(volume, { junk });
   const compactMs = clock() - compactStart;
-
-  const used = await usedSpace(drive);
-  signal.throwIfAborted();
 
   const slot = store.publish(drive, snap, {
     recordsTotal: volume.recordsTotal,

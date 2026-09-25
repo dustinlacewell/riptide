@@ -57,6 +57,12 @@ export function createMapStore({ keep = createKeep(), now = Date.now } = {}) {
    */
   function publish(drive, snap, { recordsTotal = 0, version = null, context = null } = {}) {
     const key = keyOf(drive);
+    // Never replace a snapshot of a newer tree with one of an older tree.
+    const held = slots.get(key);
+    if (held && held.version !== null && version !== null && version < held.version) {
+      keep.touch(key);
+      return held;
+    }
     snap.gen = ++counter;
     // `read` names the snapshot; `gen` also moves when a delete changes it.
     // Ids stay valid while `read` is the same.

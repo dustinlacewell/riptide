@@ -185,6 +185,43 @@ test("rebuild: a tree the journal moved on rebuilds its snapshot, junk and all",
   assert.equal(rebuildMap({ drive: "D:", tree: volume, store }), null, "no snapshot held");
 });
 
+test("store: a snapshot of an older tree never replaces a newer one", () => {
+  const store = createMapStore();
+  const newer = store.publish("C:", buildSnapshot(tree(1).tree), { version: 5 });
+  const late = store.publish("C:", buildSnapshot(tree(2).tree), { version: 4 });
+  assert.equal(late, newer);
+  assert.equal(store.get("C:").snap.bytes[0], 6);
+  assert.ok(store.publish("C:", buildSnapshot(tree(3).tree), { version: 5 }).gen > newer.gen, "same version may refresh");
+});
+
+test("read: a rebuild landing while the read waits is not overwritten", async () => {
+  const store = createMapStore();
+  const made = tree(10);
+  const live = { ...made.tree, version: 0 };
+  await readMap({ drive: "C:", store, patterns: ["node_modules"], usedSpace: noSpace, readTree: async () => ({ ...live }) });
+
+  // A second read gets the tree at version 1 ...
+  live.version = 1;
+  const reading = readMap({
+    drive: "C:",
+    store,
+    patterns: ["node_modules"],
+    usedSpace: noSpace,
+    readTree: async () => {
+      const copy = { ...live };
+      // ... and while it runs, the journal moves the tree to 2 and the
+      // rebuild publishes that.
+      live.ownBytes = new Map(live.ownBytes).set(made.byPath.get("Users\\dustin\\code\\src"), 50n);
+      live.version = 2;
+      rebuildMap({ drive: "C:", tree: live, store });
+      return copy;
+    },
+  });
+  await reading;
+  assert.equal(store.get("C:").version, 2);
+  assert.equal(store.get("C:").snap.bytes[0], 60, "the newer tree's bytes stay");
+});
+
 test("read: a fired signal reads nothing", async () => {
   const store = createMapStore();
   const controller = new AbortController();
