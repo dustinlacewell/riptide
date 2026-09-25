@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import * as api from "./api.js";
+import { refusedPaths } from "./risk.js";
 
 /**
  * The plan / confirm / delete cycle, shared by the Zap and Caches tabs.
@@ -17,12 +18,19 @@ export function useZapFlow(onDeleted) {
   const [zapping, setZapping] = useState(null);
   const [outcome, setOutcome] = useState(null);
   const [error, setError] = useState(null);
+  // Paths the server screened out. The screen is fixed, so once refused a
+  // path stays refused; each plan adds to the set rather than replacing it.
+  const [refused, setRefused] = useState(() => new Set());
 
   const preparePlan = useCallback(async (paths, bytes) => {
     setError(null);
     setPlanning(true);
     try {
-      setPending(await api.plan(paths, bytes));
+      const plan = await api.plan(paths, bytes);
+      if (plan.refused.length > 0) {
+        setRefused((prev) => new Set([...prev, ...refusedPaths(plan.refused)]));
+      }
+      setPending(plan);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -65,6 +73,7 @@ export function useZapFlow(onDeleted) {
     zapping,
     outcome,
     error,
+    refused,
     setError,
     setOutcome,
     preparePlan,

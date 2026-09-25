@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
-import { bytes, sumBytes, when } from "./format.js";
+import { bytes, sumBytes } from "./format.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
+import HitRow from "./HitRow.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import RootField from "./RootField.jsx";
+import Callout from "./ui/Callout.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
+import { riskOf } from "./risk.js";
 import { COLUMNS, DEFAULT_SORT, nextSort, sortHits } from "./sort.js";
 import { useRowPainter } from "./useRowPainter.js";
 import { useZapFlow } from "./useZapFlow.js";
@@ -50,9 +53,13 @@ export default function ZapPanel({
     () => sortHits(result?.hits ?? [], sort),
     [result, sort],
   );
+  // A refused path never goes into a plan, whatever its checkbox said.
   const selected = useMemo(
-    () => hits.filter((h) => !spared.has(h.path)),
-    [hits, spared],
+    () =>
+      hits.filter(
+        (h) => !spared.has(h.path) && riskOf(h, flow.refused) !== "refused",
+      ),
+    [hits, spared, flow.refused],
   );
   const selectedBytes = useMemo(
     () => sumBytes(selected.map((h) => h.bytes)),
@@ -157,12 +164,12 @@ export default function ZapPanel({
           </div>
 
           {result.strategy === "walk" && (
-            <p className="note">
+            <Callout tone="info">
               Directory walk
               {/EPERM|EACCES/.test(result.reason ?? "")
                 ? " — the MFT scan needs an elevated shell. Run the dev server as administrator for a much faster scan."
                 : `: ${result.reason}`}
-            </p>
+            </Callout>
           )}
 
           {hits.length > 0 && (
@@ -178,6 +185,7 @@ export default function ZapPanel({
                 <thead>
                   <tr>
                     <th />
+                    <th />
                     <SortHeader
                       columns={COLUMNS}
                       sort={sort}
@@ -187,26 +195,15 @@ export default function ZapPanel({
                 </thead>
                 <tbody>
                   {hits.map((hit) => (
-                    <tr
+                    <HitRow
                       key={hit.path}
-                      className={spared.has(hit.path) ? "spared" : ""}
-                      onPointerDown={(e) => onPointerDown(e, hit.path)}
-                      onPointerEnter={() => onPointerEnter(hit.path)}
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={!spared.has(hit.path)}
-                          onChange={(e) => setChecked([hit.path], e.target.checked)}
-                        />
-                      </td>
-                      <td className="path" title={hit.path}>
-                        {hit.path}
-                      </td>
-                      <td className="num">{bytes(hit.bytes)}</td>
-                      <td className="num">{hit.files.toLocaleString()}</td>
-                      <td className="num">{when(hit.mtime)}</td>
-                    </tr>
+                      hit={hit}
+                      risk={riskOf(hit, flow.refused)}
+                      spared={spared.has(hit.path)}
+                      setChecked={setChecked}
+                      onPointerDown={onPointerDown}
+                      onPointerEnter={onPointerEnter}
+                    />
                   ))}
                 </tbody>
               </table>

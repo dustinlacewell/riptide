@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Glyph from "./ui/Glyph.jsx";
 
 /**
  * One file in the search results: a header row that expands to show the
@@ -10,7 +11,7 @@ export default function FileResult({ file, root }) {
   return (
     <div className={`file-result${open ? " open" : ""}`}>
       <button className="file-head" onClick={() => setOpen((v) => !v)}>
-        <span className="caret">{open ? "▾" : "▸"}</span>
+        <Glyph name="caret" className={`caret${open ? " open" : ""}`} />
         <span className="file-path" title={file.path}>
           {relativeTo(file.path, root)}
         </span>

@@ -242,36 +242,62 @@ button.cog:hover:not(:disabled) {
   font-size: var(--fs-caps);
 }
 
-.caution-flag {
-  margin-left: 6px;
-  padding: 1px 6px;
-  border: 1px solid var(--caution);
-  border-radius: var(--r-sm);
-  color: var(--caution);
+/* --- risk ---------------------------------------------------------------- */
+
+.risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-pill);
   font-size: var(--fs-caps);
-  text-transform: uppercase;
+  font-weight: 600;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.risk-compact {
+  height: auto;
+  padding: 0;
+  background: none;
+}
+
+.risk-safe {
+  color: var(--safe);
+  background: var(--safe-wash);
+}
+
+.risk-caution {
+  color: var(--caution);
+  background: var(--caution-wash);
+}
+
+.risk-refused {
+  color: var(--refused);
+  background: var(--refused-wash);
+}
+
+.risk-compact.risk-safe,
+.risk-compact.risk-caution,
+.risk-compact.risk-refused {
+  background: none;
+}
+
+.config-label .risk {
+  margin-left: 6px;
   cursor: help;
 }
 
-.problems {
-  padding: var(--s-2) var(--s-3);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  font-size: var(--fs-body);
-}
-
 .problems summary {
-  color: var(--dim);
   cursor: pointer;
 }
 
 .problems ul {
   margin: var(--s-2) 0 0;
-  padding-left: 18px;
   font-family: var(--font-mono);
-  color: var(--dim);
 }
 
 /* --- search results ------------------------------------------------------ */
@@ -498,7 +524,6 @@ button.danger:disabled {
 /* --- status -------------------------------------------------------------- */
 
 .status,
-.note,
 .empty {
   color: var(--dim);
   font-size: var(--fs-body);
@@ -513,22 +538,42 @@ button.danger:disabled {
 }
 
 .outcome {
-  padding: 10px var(--s-3);
-  background: var(--current-wash);
-  border: 1px solid var(--current);
+  padding: var(--s-3) var(--s-4);
+  background: var(--done-wash);
   border-radius: var(--r-md);
 }
 
-.outcome p {
+.outcome-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
   margin: 0;
 }
 
+.outcome-line .glyph {
+  color: var(--done);
+}
+
 .failures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
   margin: var(--s-2) 0 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   font-family: var(--font-mono);
   font-size: var(--fs-body);
-  color: var(--danger);
+}
+
+.failures li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.failures .glyph,
+.failures em {
+  color: var(--failed);
 }
 
 .zapping .bar {
@@ -654,6 +699,44 @@ button.sort .arrow {
   opacity: 0.35;
 }
 
+/* Caution rows carry an amber edge; refused rows a red tint and a lock
+   where the checkbox would be. */
+.hits tr.caution > td:first-child {
+  box-shadow: inset 3px 0 0 var(--caution);
+}
+
+.hits tr.refused {
+  background: var(--refused-tint);
+  cursor: default;
+}
+
+.hits tr.refused td {
+  color: var(--dim);
+}
+
+.hits tr.refused .lock {
+  display: inline-flex;
+  color: var(--refused);
+}
+
+.hits tr.refused .never {
+  color: var(--refused);
+}
+
+.hits td.risk-cell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.hits th.plain {
+  height: 36px;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 /* During a shift-drag the pointer sweeps across rows; a text selection
    forming underneath it makes the sweep look broken. */
 .hits.painting {
@@ -707,6 +790,15 @@ button.twist {
 
 button.twist:hover .caret {
   color: var(--text);
+}
+
+.caret.glyph {
+  width: 12px;
+  transition: transform var(--t-quick) var(--ease-out);
+}
+
+.caret.open {
+  transform: rotate(90deg);
 }
 
 .rule-count {
@@ -772,19 +864,19 @@ button.twist:hover .caret {
   color: var(--dim);
 }
 
-.refused {
+.dialog .callout {
   margin-bottom: var(--s-4);
-  padding: 10px var(--s-3);
-  background: var(--refused-wash);
-  border: 1px solid var(--refused);
-  border-radius: var(--r-md);
-  font-size: var(--fs-body);
 }
 
-.refused ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
+.refused-list li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-mono);
+}
+
+.refused-list em {
+  color: var(--dim);
 }
 
 .permanent,

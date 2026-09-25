@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import * as api from "./api.js";
 import { bytes, sumBytes } from "./format.js";
+import { riskOf } from "./risk.js";
+import CacheRuleRows from "./CacheRuleRows.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import CacheSettings from "./CacheSettings.jsx";
 import RootField from "./RootField.jsx";
+import Callout from "./ui/Callout.jsx";
+import Glyph from "./ui/Glyph.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
 import { useZapFlow } from "./useZapFlow.js";
 import { useRowPainter } from "./useRowPainter.js";
@@ -116,9 +120,13 @@ export default function CachePanel({
   // buttons and the zap plan; only the table is grouped.
   const found = arrived;
 
+  // A refused path never goes into a plan, whatever its checkbox said.
   const selected = useMemo(
-    () => found.filter((c) => !spared.has(c.path)),
-    [found, spared],
+    () =>
+      found.filter(
+        (c) => !spared.has(c.path) && riskOf(c, flow.refused) !== "refused",
+      ),
+    [found, spared, flow.refused],
   );
   const selectedBytes = useMemo(
     () => sumBytes(selected.map((c) => c.bytes)),
@@ -151,7 +159,7 @@ export default function CachePanel({
   const cautions = useMemo(() => {
     const byId = new Map();
     for (const c of selected) {
-      if (c.risk === "caution" && !byId.has(c.id)) byId.set(c.id, c);
+      if (riskOf(c) === "caution" && !byId.has(c.id)) byId.set(c.id, c);
     }
     return [...byId.values()];
   }, [selected]);
@@ -192,16 +200,7 @@ export default function CachePanel({
           title="Cache configs"
           aria-label="Cache configs"
         >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M8 5.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zm0 1.2a1.3 1.3 0 110 2.6 1.3 1.3 0 010-2.6z"
-            />
-            <path
-              fill="currentColor"
-              d="M7.1 1h1.8l.25 1.6a5.4 5.4 0 011.2.5l1.32-.95 1.27 1.27-.95 1.32c.21.38.38.78.5 1.2L14 6.2v1.8l-1.6.25c-.12.42-.29.82-.5 1.2l.95 1.32-1.27 1.27-1.32-.95c-.38.21-.78.38-1.2.5L8.9 15H7.1l-.25-1.6a5.4 5.4 0 01-1.2-.5l-1.32.95-1.27-1.27.95-1.32a5.4 5.4 0 01-.5-1.2L2 8.9V7.1l1.6-.25c.12-.42.29-.82.5-1.2l-.95-1.32 1.27-1.27 1.32.95c.38-.21.78-.38 1.2-.5L7.1 1zm.87 1.2l-.2 1.3-.6.16a4.2 4.2 0 00-.93.39l-.54.3-1.07-.76-.16.16.77 1.07-.3.54c-.17.29-.3.6-.4.93l-.15.6-1.3.2v.22l1.3.2.16.6c.1.33.22.64.39.93l.3.54-.77 1.07.16.16 1.07-.77.54.3c.29.17.6.3.93.4l.6.15.2 1.3h.22l.2-1.3.6-.16c.33-.1.64-.22.93-.39l.54-.3 1.07.77.16-.16-.77-1.07.3-.54c.17-.29.3-.6.4-.93l.15-.6 1.3-.2v-.22l-1.3-.2-.16-.6a4.2 4.2 0 00-.39-.93l-.3-.54.77-1.07-.16-.16-1.07.77-.54-.3a4.2 4.2 0 00-.93-.4l-.6-.15-.2-1.3h-.22z"
-            />
-          </svg>
+          <Glyph name="cog" size={20} />
         </button>
 
         <button className="primary" onClick={scan} disabled={loading}>
@@ -210,10 +209,10 @@ export default function CachePanel({
       </section>
 
       {!summary && !loading && (
-        <p className="note">
+        <Callout tone="info">
           Searches under the root only. Reads that drive's MFT, so expect a
           minute or two.
-        </p>
+        </Callout>
       )}
 
       {progress && (
@@ -232,14 +231,16 @@ export default function CachePanel({
       {flow.error && <p className="error">{flow.error}</p>}
 
       {problems.length > 0 && (
-        <details className="problems">
-          <summary>{problems.length} pack issues</summary>
-          <ul>
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </details>
+        <Callout tone="info">
+          <details className="problems">
+            <summary>{problems.length} pack issues</summary>
+            <ul>
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </details>
+        </Callout>
       )}
 
       <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
@@ -275,6 +276,7 @@ export default function CachePanel({
               <tr>
                 <th />
                 <th />
+                <th className="plain">Risk</th>
                 <SortHeader
                   columns={CACHE_GROUP_COLUMNS}
                   sort={sort}
@@ -284,9 +286,10 @@ export default function CachePanel({
             </thead>
             <tbody>
               {rules.map((rule) => (
-                <RuleRows
+                <CacheRuleRows
                   key={rule.id}
                   rule={rule}
+                  refused={flow.refused}
                   open={opened.has(rule.id)}
                   onToggle={toggleOpen}
                   spared={spared}
@@ -299,16 +302,15 @@ export default function CachePanel({
           </table>
 
           {cautions.length > 0 && (
-            <div className="refused">
-              <strong>Read before deleting</strong>
+            <Callout tone="caution" title="Read before deleting">
               <ul>
                 {cautions.map((c) => (
                   <li key={c.path}>
-                    {c.label} — {c.riskNote}
+                    <strong>{c.label}</strong> — {c.riskNote}
                   </li>
                 ))}
               </ul>
-            </div>
+            </Callout>
           )}
 
           <button
@@ -349,126 +351,5 @@ export default function CachePanel({
         />
       )}
     </>
-  );
-}
-
-/**
- * One cache rule: a summary row that expands to its instances.
- *
- * A rule matched by directory name hits once per project, so __pycache__
- * alone is eleven thousand rows. Collapsed, it is one.
- *
- * Selection is not held here. The rule's checkbox reads and writes the
- * panel's set of spared paths, so the zap plan stays a single flat path
- * list no matter which rows happen to be open.
- */
-function RuleRows({
-  rule,
-  open,
-  onToggle,
-  spared,
-  setChecked,
-  onPointerDown,
-  onPointerEnter,
-}) {
-  const paths = rule.paths.map((c) => c.path);
-  const chosen = paths.filter((p) => !spared.has(p)).length;
-  const all = chosen === paths.length;
-  const none = chosen === 0;
-
-  // A one-instance rule is just a row: show where it is rather than the
-  // count "1", and give it no caret to open.
-  const lone = rule.count === 1 ? rule.paths[0] : null;
-
-  return (
-    <>
-      <tr className={`rule${none ? " spared" : ""}${open ? " open" : ""}`}>
-        <td className="grip">
-          {!lone && (
-            <button
-              className="twist"
-              onClick={() => onToggle(rule.id)}
-              aria-expanded={open}
-              aria-label={`${open ? "Hide" : "Show"} ${rule.count} locations`}
-            >
-              <span className="caret">{open ? "▾" : "▸"}</span>
-            </button>
-          )}
-        </td>
-        <td>
-          <TriCheckbox
-            checked={all}
-            mixed={!all && !none}
-            onChange={() => setChecked(paths, !all)}
-          />
-        </td>
-        <td>
-          <span className="cache-label">{rule.label}</span>
-          {rule.risk === "caution" && (
-            <span className="caution-flag" title={rule.riskNote}>
-              caution
-            </span>
-          )}
-          <span className="cache-cost">{rule.cost}</span>
-        </td>
-        {lone ? (
-          <td className="path" title={lone.path}>
-            {lone.path}
-          </td>
-        ) : (
-          <td className="rule-count">
-            {rule.count.toLocaleString()} locations
-            {!all && !none && (
-              <span className="rule-chosen">{chosen.toLocaleString()} selected</span>
-            )}
-          </td>
-        )}
-        <td className="num">{bytes(rule.bytes)}</td>
-        <td className="num">{rule.files.toLocaleString()}</td>
-      </tr>
-
-      {open &&
-        !lone &&
-        rule.paths.map((cache) => (
-          <tr
-            key={cache.path}
-            className={`member${spared.has(cache.path) ? " spared" : ""}`}
-            onPointerDown={(e) => onPointerDown(e, cache.path)}
-            onPointerEnter={() => onPointerEnter(cache.path)}
-          >
-            <td className="grip" />
-            <td>
-              <input
-                type="checkbox"
-                checked={!spared.has(cache.path)}
-                onChange={(e) => setChecked([cache.path], e.target.checked)}
-              />
-            </td>
-            <td className="path" colSpan={2} title={cache.path}>
-              {cache.path}
-            </td>
-            <td className="num">{bytes(cache.bytes)}</td>
-            <td className="num">{cache.files.toLocaleString()}</td>
-          </tr>
-        ))}
-    </>
-  );
-}
-
-/**
- * A checkbox that can also show "some of these".
- *
- * There is no `indeterminate` attribute or React prop — it is a property on
- * the DOM node only — so it has to be written through a ref after render.
- */
-function TriCheckbox({ checked, mixed, onChange }) {
-  const box = useRef(null);
-
-  useEffect(() => {
-    if (box.current) box.current.indeterminate = mixed;
-  }, [mixed]);
-
-  return (
-    <input ref={box} type="checkbox" checked={checked} onChange={onChange} />
   );
 }

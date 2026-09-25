@@ -1,3 +1,5 @@
+import Glyph from "./ui/Glyph.jsx";
+
 /**
  * Deletion progress and result. Shared by the Zap and Caches tabs.
  */
@@ -21,17 +23,23 @@ export default function ZapStatus({ zapping, outcome }) {
 
       {outcome && (
         <div className="outcome">
-          <p>
-            Zapped {outcome.deleted.length}{" "}
-            {outcome.deleted.length === 1 ? "folder" : "folders"}
-            {outcome.permanent ? " permanently" : " to the Recycle Bin"} in{" "}
-            {(outcome.elapsedMs / 1000).toFixed(1)}s.
+          <p className="outcome-line">
+            <Glyph name="done" size={14} />
+            <span>
+              Zapped {outcome.deleted.length}{" "}
+              {outcome.deleted.length === 1 ? "folder" : "folders"}
+              {outcome.permanent ? " permanently" : " to the Recycle Bin"} in{" "}
+              {(outcome.elapsedMs / 1000).toFixed(1)}s.
+            </span>
           </p>
           {outcome.failed.length > 0 && (
             <ul className="failures">
               {outcome.failed.map((f) => (
                 <li key={f.path}>
-                  {f.path} — <em>{f.error}</em>
+                  <Glyph name="failed" size={12} label="Failed" />
+                  <span>
+                    {f.path} — <em>{f.error}</em>
+                  </span>
                 </li>
               ))}
             </ul>

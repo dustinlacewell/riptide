@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { bytes } from "./format.js";
+import Callout from "./ui/Callout.jsx";
 import Dialog from "./ui/Dialog.jsx";
 
 /**
@@ -28,23 +29,21 @@ export default function ConfirmDialog({ plan, onCancel, onConfirm }) {
       </ul>
 
       {plan.refused.length > 0 && (
-        <div className="refused">
-          <strong>{plan.refused.length} refused</strong> — protected paths are
-          never deleted:
-          <ul>
+        <Callout tone="refused" title={`Never deleted: ${plan.refused.length} refused`}>
+          <ul className="refused-list">
             {plan.refused.map((r) => (
-              <li key={r.path}>
+              <li key={r.path} title={r.path}>
                 {r.path} <em>({r.reason})</em>
               </li>
             ))}
           </ul>
-        </div>
+        </Callout>
       )}
 
       {plan.missing.length > 0 && (
-        <p className="note">
+        <Callout tone="info">
           {plan.missing.length} path(s) vanished since the scan and were skipped.
-        </p>
+        </Callout>
       )}
 
       <label className="permanent">

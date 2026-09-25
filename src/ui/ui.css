@@ -9,6 +9,63 @@
   stroke-linejoin: round;
 }
 
+/* --- Glyph --------------------------------------------------------------- */
+
+.glyph {
+  flex: 0 0 auto;
+  display: block;
+}
+
+/* --- Callout ------------------------------------------------------------- */
+
+.callout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-body);
+}
+
+.callout-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-weight: 700;
+}
+
+.callout-body ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.callout-caution {
+  background: var(--caution-wash);
+  border: 1.5px dashed var(--caution);
+}
+
+.callout-caution .callout-title {
+  color: var(--caution);
+}
+
+.callout-refused {
+  background: var(--refused-wash);
+}
+
+.callout-refused .callout-title {
+  color: var(--refused);
+}
+
+.callout-info {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--dim);
+}
+
 /* --- Dialog -------------------------------------------------------------- */
 
 .backdrop {

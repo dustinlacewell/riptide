@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api.js";
 import Dialog from "./ui/Dialog.jsx";
+import RiskBadge from "./RiskBadge.jsx";
+import { riskOf } from "./risk.js";
 
 /**
  * Which cache configs are active.
@@ -116,10 +118,8 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
                     {config.perProject && (
                       <span className="config-tag">per project</span>
                     )}
-                    {config.risk === "caution" && (
-                      <span className="caution-flag" title={config.riskNote}>
-                        caution
-                      </span>
+                    {riskOf(config) === "caution" && (
+                      <RiskBadge risk="caution" note={config.riskNote} />
                     )}
                   </span>
                   <span className="config-where">
