@@ -1,9 +1,17 @@
+/*
+ * Every rule here applies only inside an .rt-app element, so the app can
+ * sit in another page (the project site) without styling it or being
+ * styled by it. The layer lets that page decide the order. Keyframes are
+ * global and sit after the scope.
+ */
+@layer riptide {
+@scope (.rt-app) {
+
 * {
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
+:scope {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
@@ -86,13 +94,6 @@ button.tab.active {
   border-radius: var(--r-pill);
   background: var(--current);
   animation: tab-pulse 900ms ease-in-out infinite;
-}
-
-@keyframes tab-pulse {
-  50% {
-    transform: scale(1.6);
-    opacity: 0.55;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -801,12 +802,6 @@ button.primary:disabled {
   animation: row-wipe var(--t-base) var(--ease-in) forwards;
 }
 
-@keyframes row-wipe {
-  to {
-    clip-path: inset(0 0 0 100%);
-  }
-}
-
 .hits tr.failed {
   background: var(--failed-wash);
 }
@@ -995,13 +990,6 @@ button.zap:disabled {
    stagger. */
 .row-in {
   animation: row-in var(--t-base) var(--ease-out) backwards;
-}
-
-@keyframes row-in {
-  from {
-    opacity: 0;
-    transform: translateX(-24px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1917,3 +1905,27 @@ button.row.up .row-name {
 .map-row--refused .map-row-name {
   color: var(--dim);
 }
+
+} /* @scope (.rt-app) */
+
+@keyframes tab-pulse {
+  50% {
+    transform: scale(1.6);
+    opacity: 0.55;
+  }
+}
+
+@keyframes row-wipe {
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+} /* @layer riptide */

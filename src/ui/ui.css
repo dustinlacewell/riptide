@@ -1,4 +1,7 @@
-/* Primitive styles. Tokens only; no domain names. */
+/* Primitive styles. Tokens only; no domain names. Scoped like index.css. */
+
+@layer riptide {
+@scope (.rt-app) {
 
 .wave-mark {
   flex: 0 0 auto;
@@ -125,18 +128,6 @@
   animation: meter-glow var(--t-surge) var(--ease-out);
 }
 
-@keyframes meter-drift {
-  to {
-    background-position: 18.48px 0;
-  }
-}
-
-@keyframes meter-glow {
-  35% {
-    box-shadow: 0 0 24px 4px var(--current-glow);
-  }
-}
-
 /* --- Stat ---------------------------------------------------------------- */
 
 .stat {
@@ -220,13 +211,6 @@
   color: var(--text);
 }
 
-@keyframes phase-pulse {
-  50% {
-    transform: scale(1.6);
-    opacity: 0.55;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .meter-flow,
   .meter-glow,
@@ -240,6 +224,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
+  z-index: 1000;
   background: var(--scrim);
   display: grid;
   place-items: center;
@@ -265,3 +250,26 @@
   font-size: var(--fs-title);
   font-weight: 600;
 }
+
+} /* @scope (.rt-app) */
+
+@keyframes meter-drift {
+  to {
+    background-position: 18.48px 0;
+  }
+}
+
+@keyframes meter-glow {
+  35% {
+    box-shadow: 0 0 24px 4px var(--current-glow);
+  }
+}
+
+@keyframes phase-pulse {
+  50% {
+    transform: scale(1.6);
+    opacity: 0.55;
+  }
+}
+
+} /* @layer riptide */

@@ -1,0 +1,9 @@
+/*
+ * The standalone app's page: the app fills the window, so the page takes
+ * its background. Only main.jsx imports this; a page that embeds the app
+ * keeps its own body.
+ */
+body {
+  margin: 0;
+  background: var(--bg);
+}
