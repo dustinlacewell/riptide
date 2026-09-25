@@ -12,12 +12,24 @@
  *     detect(ctx) -> Promise<{available, reason?, bytes: string|null}>,
  *     steps(ctx)  -> Promise<[{exe, args, timeoutMs, label?, writes?}]> }
  *
- *   ctx: {env, spawn}. detect may run read-only probes through ctx.spawn
+ *   ctx: {env, spawn, drives, tmpdir?}. detect may run read-only probes through ctx.spawn
  *   and stat known paths. bytes is a decimal string, or null when the
  *   command's gain cannot be known beforehand.
  */
 
-export const ACTIONS = [];
+import pnpmStorePrune from "./pnpm-store-prune.js";
+import dockerBuilderPrune from "./docker-builder-prune.js";
+import dockerImagePrune from "./docker-image-prune.js";
+import wslCompact from "./wsl-compact.js";
+import windowsComponentCleanup from "./windows-component-cleanup.js";
+
+export const ACTIONS = [
+  pnpmStorePrune,
+  dockerBuilderPrune,
+  dockerImagePrune,
+  wslCompact,
+  windowsComponentCleanup,
+];
 
 const BY_ID = new Map(ACTIONS.map((a) => [a.id, a]));
 
