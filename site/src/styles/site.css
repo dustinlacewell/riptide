@@ -10,7 +10,8 @@
 @layer site {
 
 :root {
-  --site-width: 1080px;
+  /* One column for the whole page: the hero's app window fills it exactly. */
+  --site-width: 1200px;
   --gutter: var(--s-4);
   --fs-lead: 18px;
   --fs-section: 28px;
@@ -65,8 +66,9 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* --site-width is the content width; the gutters sit outside it. */
 .wrap {
-  max-width: var(--site-width);
+  max-width: calc(var(--site-width) + 2 * var(--gutter));
   margin: 0 auto;
   padding: 0 var(--gutter);
 }
