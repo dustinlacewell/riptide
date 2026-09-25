@@ -18,11 +18,12 @@ import Demo from "./Demo.jsx";
     <a class="cta" href="#get">Get riptide</a>
   </div>
 
-  <!-- The app needs about 900 px. Narrower screens get the figure instead
-       and never load the app. -->
+  <!-- The app needs about 900 px. Narrower screens get the figure instead.
+       The app renders only in the browser; Astro shows the fallback figure
+       until it mounts. -->
   <div class="stage wide">
-    <Demo client:visible>
-      <Telemetry />
+    <Demo client:only="react">
+      <Telemetry slot="fallback" />
     </Demo>
   </div>
   <div class="wrap narrow">
