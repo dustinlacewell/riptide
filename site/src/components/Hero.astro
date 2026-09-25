@@ -6,16 +6,18 @@ import Demo from "./Demo.jsx";
 
 <header class="hero">
   <div class="wrap copy">
-    <div class="wordmark">
-      <WaveMark size={36} />
-      <span>riptide</span>
+    <div class="topbar">
+      <div class="wordmark">
+        <WaveMark size={36} />
+        <span>riptide</span>
+      </div>
+      {/* TODO: point "Get riptide" at the source repo once its URL is public. */}
+      <a class="cta" href="#get">Get riptide</a>
     </div>
     <h1>Find build junk across a drive. Uncheck what you keep. Delete the rest.</h1>
     <p class="lead">
       A disk cleaner for Windows developers. Below is the real app on a made-up drive. Press Scan.
     </p>
-    {/* TODO: point "Get riptide" at the source repo once its URL is public. */}
-    <a class="cta" href="#get">Get riptide</a>
   </div>
 
   <!-- The app window scales down to about 900 px. Narrower screens get the
@@ -36,7 +38,7 @@ import Demo from "./Demo.jsx";
     display: flex;
     flex-direction: column;
     gap: var(--s-6);
-    padding-top: 64px;
+    padding-top: var(--s-5);
   }
 
   .copy {
@@ -44,6 +46,14 @@ import Demo from "./Demo.jsx";
     flex-direction: column;
     gap: var(--s-4);
     align-items: flex-start;
+    width: 100%;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
     width: 100%;
   }
 
