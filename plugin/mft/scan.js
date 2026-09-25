@@ -48,7 +48,8 @@ const now = () => performance.now();
  *   count. It may be the same test as matches.
  * @returns {Promise<{strategy: "mft"|"walk", reason?: string,
  *                    hits: Array<{path: string, bytes: string, files: number,
- *                                 mtime: string|null}>,
+ *                                 mtime: number|null}>,
+ *   mtime is the folder's own modified time, Unix ms.
  *                    stats: {records: number, readMs: number,
  *                            indexMs: number, sizeMs: number}}>}
  */
@@ -124,7 +125,7 @@ async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal
  *          query?: {exact: Set<string>, ext: Set<string>}|null,
  *          countMatch?: (name: string) => boolean,
  *          signal?: AbortSignal, clock?: () => number}} [opts]
- * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map,
+ * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map, ownLatest: Map,
  *                    marks: Map<number, Set<string>>, drive: string,
  *                    recordsDone: number, recordsTotal: number,
  *                    readMs: number}>}
@@ -198,7 +199,7 @@ function sizeHits({ dirs, ownBytes, ownFiles }, resolved) {
         path: full,
         bytes: total.bytes.toString(),
         files: total.files,
-        mtime: record.mtime ? record.mtime.toISOString() : null,
+        mtime: record.mtime,
       };
     })
     .sort(bySizeDescending);
@@ -287,7 +288,7 @@ async function measureSubtree(root, signal) {
   let mtime = null;
 
   try {
-    mtime = (await fsp.stat(root)).mtime.toISOString();
+    mtime = Math.floor((await fsp.stat(root)).mtimeMs);
   } catch {
     /* keep null */
   }

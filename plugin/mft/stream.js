@@ -69,8 +69,10 @@ export function intervalGate(clock, everyMs) {
  *          onProgress?: Function, signal?: AbortSignal,
  *          clock?: () => number}} opts
  * @returns {Promise<{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
- *            ownFiles: Map<number, number>, marks: Map<number, Set<string>>,
- *            recordsDone: number}>}
+ *            ownFiles: Map<number, number>, ownLatest: Map<number, number>,
+ *            marks: Map<number, Set<string>>, recordsDone: number}>}
+ *   ownLatest is the newest file modified time (Unix ms) directly in each
+ *   directory; a directory with no dated files has no entry.
  */
 export async function streamMftRecords({
   read,
@@ -87,6 +89,7 @@ export async function streamMftRecords({
   const dirs = new Map();
   const ownBytes = new Map();
   const ownFiles = new Map();
+  const ownLatest = new Map();
   const marks = new Map();
   const due = intervalGate(clock, EMIT_MS);
 
@@ -143,6 +146,7 @@ export async function streamMftRecords({
         // Fold into the parent's total, then let the record go.
         ownBytes.set(entry.parent, (ownBytes.get(entry.parent) ?? 0n) + entry.size);
         ownFiles.set(entry.parent, (ownFiles.get(entry.parent) ?? 0) + 1);
+        foldLatest(ownLatest, entry.parent, entry.mtime);
 
         if (query) {
           marked += markFile(marks, query, entry.name, entry.parent);
@@ -158,5 +162,16 @@ export async function streamMftRecords({
     }
   }
 
-  return { dirs, ownBytes, ownFiles, marks, recordsDone: recordNumber };
+  return { dirs, ownBytes, ownFiles, ownLatest, marks, recordsDone: recordNumber };
+}
+
+/**
+ * Keep the newest file modified time seen in a directory. Only files count:
+ * a directory's own time moves whenever an entry is added or removed —
+ * including by this tool's own deletes — so it says nothing about work.
+ */
+function foldLatest(ownLatest, parent, mtime) {
+  if (mtime === null) return;
+  const held = ownLatest.get(parent);
+  if (held === undefined || mtime > held) ownLatest.set(parent, mtime);
 }

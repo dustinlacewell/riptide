@@ -69,7 +69,8 @@ export function applyFixup(rec, bytesPerSector) {
  * @param {Buffer} rec a single record, fixups already applied
  * @param {number} recordNumber this record's index in the MFT
  * @returns {null|{recordNumber: number, isDirectory: boolean, name: string,
- *                 parent: number, size: bigint, mtime: Date|null}}
+ *                 parent: number, size: bigint, mtime: number|null}}
+ *          mtime is the $STANDARD_INFORMATION modified time, Unix ms
  *          null when the record is unused or not a real entry
  */
 export function parseFileRecord(rec, recordNumber) {
@@ -102,7 +103,7 @@ export function parseFileRecord(rec, recordNumber) {
     if (type === ATTR_STANDARD_INFORMATION && !nonResident) {
       const content = residentContent(rec, pos);
       if (content && content.length >= 24) {
-        mtime = filetimeToDate(content.readBigUInt64LE(8));
+        mtime = filetimeToMs(content.readUInt32LE(12), content.readUInt32LE(8));
       }
     } else if (type === ATTR_FILE_NAME && !nonResident) {
       const content = residentContent(rec, pos);
@@ -184,14 +185,19 @@ function residentContent(rec, attrPos) {
   return rec.subarray(start, end);
 }
 
+const EPOCH_DIFF_MS = 11644473600000;
+const TICKS_PER_MS = 10000;
+const TWO_POW_32 = 4294967296;
+
 /**
- * Windows FILETIME is 100ns ticks since 1601-01-01 UTC.
+ * Windows FILETIME is 100ns ticks since 1601-01-01 UTC. Read as two 32-bit
+ * halves and combined as a double: this runs once per record, and a BigInt
+ * or a Date per record is millions of allocations. The double loses a few
+ * ticks of precision, far below a millisecond.
+ *
+ * @returns {number|null} Unix milliseconds
  */
-function filetimeToDate(ticks) {
-  if (ticks === 0n) return null;
-  const EPOCH_DIFF_MS = 11644473600000n;
-  const ms = ticks / 10000n - EPOCH_DIFF_MS;
-  const asNumber = Number(ms);
-  if (!Number.isFinite(asNumber)) return null;
-  return new Date(asNumber);
+function filetimeToMs(high, low) {
+  if (high === 0 && low === 0) return null;
+  return Math.floor((high * TWO_POW_32 + low) / TICKS_PER_MS) - EPOCH_DIFF_MS;
 }

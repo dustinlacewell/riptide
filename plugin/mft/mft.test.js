@@ -130,8 +130,11 @@ test("fixup: a torn record is detected, not silently accepted", () => {
 
 // --- file records ----------------------------------------------------------
 
-/** Build a minimal in-use record with $FILE_NAME and a resident $DATA. */
-function makeRecord({ name, parent, isDirectory = false, size = 0 }) {
+/**
+ * Build a minimal in-use record with $FILE_NAME and a resident $DATA, and a
+ * $STANDARD_INFORMATION when mtime (Unix ms) is given.
+ */
+function makeRecord({ name, parent, isDirectory = false, size = 0, mtime = null }) {
   const rec = Buffer.alloc(1024);
   rec.write("FILE", 0, "latin1");
   rec.writeUInt16LE(0, 0x04);
@@ -140,6 +143,17 @@ function makeRecord({ name, parent, isDirectory = false, size = 0 }) {
   rec.writeUInt16LE(isDirectory ? 0x0003 : 0x0001, 0x16);
 
   let pos = 0x38;
+
+  // $STANDARD_INFORMATION: modified time is the FILETIME at content + 8.
+  if (mtime !== null) {
+    rec.writeUInt32LE(0x10, pos);
+    rec.writeUInt32LE(0x48, pos + 4);
+    rec.writeUInt8(0, pos + 8);
+    rec.writeUInt32LE(0x30, pos + 0x10);
+    rec.writeUInt16LE(0x18, pos + 0x14);
+    rec.writeBigUInt64LE((BigInt(mtime) + 11644473600000n) * 10000n, pos + 0x18 + 8);
+    pos += 0x48;
+  }
 
   // $FILE_NAME
   const nameBytes = Buffer.from(name, "utf16le");
@@ -204,6 +218,12 @@ test("file record: ignores anything without a FILE signature", () => {
 test("file record: reads a resident $DATA size", () => {
   const parsed = parseFileRecord(makeRecord({ name: "small.txt", parent: 5, size: 1234 }), 7);
   assert.equal(parsed.size, 1234n);
+});
+
+test("file record: modified time is Unix ms, null when absent", () => {
+  const at = Date.UTC(2025, 2, 14, 9, 26, 53, 589);
+  assert.equal(parseFileRecord(makeRecord({ name: "a", parent: 5, mtime: at }), 7).mtime, at);
+  assert.equal(parseFileRecord(makeRecord({ name: "a", parent: 5 }), 7).mtime, null);
 });
 
 // --- tree ------------------------------------------------------------------
@@ -366,6 +386,26 @@ test("stream: files fold into their parent and are not kept", async () => {
   assert.equal(result.dirs.size, 3);
   assert.equal(result.ownBytes.get(5), 100n);
   assert.equal(result.ownFiles.get(5), 1);
+});
+
+test("stream: ownLatest keeps each folder's newest file time, ignoring folder times", async () => {
+  const buf = makeMft(8, {
+    5: { name: ".", parent: 5, isDirectory: true, mtime: 9_000 },
+    6: { name: "proj", parent: 5, isDirectory: true, mtime: 9_000 },
+    // A folder's own time is newer than any file: it must not count.
+    7: { name: "sub", parent: 6, isDirectory: true, mtime: 8_000 },
+    2: { name: "old.js", parent: 6, mtime: 1_000 },
+    3: { name: "new.js", parent: 6, mtime: 3_000 },
+    4: { name: "mid.js", parent: 6, mtime: 2_000 },
+    1: { name: "undated.js", parent: 7 },
+  });
+  const { ownLatest } = await streamMftRecords({
+    read: readerOf(buf),
+    ranges: [{ offset: 0n, length: BigInt(buf.length) }],
+    boot: BOOT,
+    clock: steppingClock(0),
+  });
+  assert.deepEqual([...ownLatest], [[6, 3_000]]);
 });
 
 test("tree: sibling matches are both reported", () => {

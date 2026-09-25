@@ -58,9 +58,9 @@ test("sorts by file count", () => {
 
 test("sorts by modified date, newest first", () => {
   const rows = [
-    hit("old", 1, 1, "2020-01-01T00:00:00Z"),
-    hit("new", 1, 1, "2026-01-01T00:00:00Z"),
-    hit("mid", 1, 1, "2023-01-01T00:00:00Z"),
+    hit("old", 1, 1, Date.UTC(2020, 0, 1)),
+    hit("new", 1, 1, Date.UTC(2026, 0, 1)),
+    hit("mid", 1, 1, Date.UTC(2023, 0, 1)),
   ];
   assert.deepEqual(
     paths(sortHits(rows, { key: "mtime", direction: "desc" })),
@@ -69,7 +69,7 @@ test("sorts by modified date, newest first", () => {
 });
 
 test("rows with no timestamp sort oldest", () => {
-  const rows = [hit("dated", 1, 1, "2020-01-01T00:00:00Z"), hit("undated", 1, 1, null)];
+  const rows = [hit("dated", 1, 1, Date.UTC(2020, 0, 1)), hit("undated", 1, 1, null)];
   assert.deepEqual(
     paths(sortHits(rows, { key: "mtime", direction: "desc" })),
     ["dated", "undated"],

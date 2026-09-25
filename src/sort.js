@@ -68,16 +68,10 @@ const COMPARATORS = {
   bytes: (a, b) => cmpBigInt(BigInt(a.bytes), BigInt(b.bytes)),
   files: (a, b) => a.files - b.files,
   // Missing timestamps sort oldest, so they never displace real dates.
-  mtime: (a, b) => timeOf(a.mtime) - timeOf(b.mtime),
+  mtime: (a, b) => (a.mtime ?? 0) - (b.mtime ?? 0),
 };
 
 /** Shared so grouped sorting compares sizes the same way, as BigInt. */
 export function cmpBigInt(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function timeOf(iso) {
-  if (!iso) return 0;
-  const t = new Date(iso).getTime();
-  return Number.isNaN(t) ? 0 : t;
 }
