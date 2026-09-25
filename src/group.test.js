@@ -106,16 +106,15 @@ test("members compare as BigInt, not Number", () => {
   assert.deepEqual(paths(groupHits(rows)[0].paths), ["large", "small"]);
 });
 
-test("carries the rule's label, cost and caution onto the group", () => {
-  const rows = [
-    hit("docker", "a", 1, 1, { caution: "stops running containers", cost: "slow" }),
-    hit("docker", "b", 1, 1, { caution: "stops running containers", cost: "slow" }),
-  ];
+test("carries the rule's label, cost and risk onto the group", () => {
+  const risky = { risk: "caution", riskNote: "stops running containers", cost: "slow" };
+  const rows = [hit("docker", "a", 1, 1, risky), hit("docker", "b", 1, 1, risky)];
   const [group] = groupHits(rows);
 
   assert.equal(group.label, "docker cache");
   assert.equal(group.cost, "slow");
-  assert.equal(group.caution, "stops running containers");
+  assert.equal(group.risk, "caution");
+  assert.equal(group.riskNote, "stops running containers");
 });
 
 test("sorts groups by summed size", () => {

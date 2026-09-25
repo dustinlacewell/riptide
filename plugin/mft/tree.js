@@ -22,6 +22,26 @@ export function indexRecords(records) {
 }
 
 /**
+ * Index directory records by their parent's record number.
+ *
+ * The root is its own parent on NTFS; it is left out of its own child list
+ * so a walk down from the root cannot loop back to it.
+ *
+ * @param {Map<number, object>} dirs directory records by record number
+ * @returns {Map<number, object[]>}
+ */
+export function childIndex(dirs) {
+  const childrenOf = new Map();
+  for (const rec of dirs.values()) {
+    if (rec.recordNumber === rec.parent) continue;
+    let list = childrenOf.get(rec.parent);
+    if (!list) childrenOf.set(rec.parent, (list = []));
+    list.push(rec);
+  }
+  return childrenOf;
+}
+
+/**
  * Resolve a record to a full path.
  *
  * Returns null when the chain is broken (a deleted parent) or cyclic. A
@@ -66,16 +86,11 @@ export function resolvePath(byNumber, record, driveLetter) {
  * @param {Map<number, bigint>} ownBytes bytes of files directly in each dir
  * @param {Map<number, number>} ownFiles count of files directly in each dir
  * @param {Iterable<number>} rootNumbers directories to total
+ * @param {Map<number, object[]>} [children] from childIndex, when the caller
+ *        already built one
  * @returns {Map<number, {bytes: bigint, files: number}>}
  */
-export function subtreeSizes(dirs, ownBytes, ownFiles, rootNumbers) {
-  const childDirs = new Map();
-  for (const rec of dirs.values()) {
-    let list = childDirs.get(rec.parent);
-    if (!list) childDirs.set(rec.parent, (list = []));
-    list.push(rec.recordNumber);
-  }
-
+export function subtreeSizes(dirs, ownBytes, ownFiles, rootNumbers, children = childIndex(dirs)) {
   const totals = new Map();
 
   for (const rootNumber of rootNumbers) {
@@ -92,8 +107,8 @@ export function subtreeSizes(dirs, ownBytes, ownFiles, rootNumbers) {
       bytes += ownBytes.get(number) ?? 0n;
       files += ownFiles.get(number) ?? 0;
 
-      for (const child of childDirs.get(number) ?? []) {
-        if (child !== number) stack.push(child);
+      for (const child of children.get(number) ?? []) {
+        stack.push(child.recordNumber);
       }
     }
 

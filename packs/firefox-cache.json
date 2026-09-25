@@ -1,0 +1,10 @@
+{
+  "id": "firefox-cache",
+  "label": "Firefox cache",
+  "tool": "firefox",
+  "paths": [
+    "%LOCALAPPDATA%\\Mozilla\\Firefox\\Profiles\\*\\cache2"
+  ],
+  "cost": "Pages and assets re-download on next visit.",
+  "pack": "apps"
+}

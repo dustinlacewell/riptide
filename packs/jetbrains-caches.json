@@ -1,0 +1,10 @@
+{
+  "id": "jetbrains-caches",
+  "label": "JetBrains IDE caches",
+  "tool": "jetbrains",
+  "paths": [
+    "%LOCALAPPDATA%\\JetBrains\\*\\caches"
+  ],
+  "cost": "Indexes rebuild when the IDE next opens a project.",
+  "pack": "editors"
+}

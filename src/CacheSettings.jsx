@@ -39,7 +39,7 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
     // Search the visible text plus the locations, so "appdata" or ".vite"
     // finds an entry whose label mentions neither.
     return configs.filter((c) =>
-      [c.label, c.tool, c.pack, c.id, ...c.locations, ...c.dirNames]
+      [c.label, c.tool, c.pack, c.id, ...c.where]
         .join(" ")
         .toLowerCase()
         .includes(q),
@@ -125,18 +125,14 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
                       {config.perProject && (
                         <span className="config-tag">per project</span>
                       )}
-                      {config.caution && (
-                        <span className="caution-flag" title={config.caution}>
+                      {config.risk === "caution" && (
+                        <span className="caution-flag" title={config.riskNote}>
                           caution
                         </span>
                       )}
                     </span>
                     <span className="config-where">
-                      {config.perProject
-                        ? config.dirNames
-                            .map((n) => (config.under ? `${config.under}/${n}` : n))
-                            .join(", ")
-                        : config.locations.join("  ·  ")}
+                      {config.where.join("  ·  ")}
                     </span>
                   </span>
                 </label>

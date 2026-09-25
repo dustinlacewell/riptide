@@ -1,0 +1,14 @@
+{
+  "id": "unity-library",
+  "label": "Unity Library",
+  "tool": "unity",
+  "dirNames": [
+    "Library"
+  ],
+  "beside": [
+    "ProjectSettings/"
+  ],
+  "cost": "Rebuilt when the project next opens.",
+  "caution": "Reimporting every asset is slow on a large project.",
+  "pack": "gamedev"
+}

@@ -8,7 +8,7 @@
     "dev:plain": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "node --test plugin/mft/mft.test.js plugin/zap.test.js plugin/grep/grep.test.js plugin/dirs.test.js plugin/caches/caches.test.js src/sort.test.js src/group.test.js src/persist.test.js src/painter.test.js src/crumbs.test.js",
+    "test": "node --test plugin/mft/mft.test.js plugin/mft/filenames.test.js plugin/zap.test.js plugin/grep/grep.test.js plugin/dirs.test.js plugin/caches/caches.test.js plugin/caches/glob.test.js plugin/caches/matchers.test.js src/sort.test.js src/group.test.js src/persist.test.js src/painter.test.js src/crumbs.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

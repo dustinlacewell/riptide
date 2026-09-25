@@ -150,7 +150,7 @@ export default function CachePanel({
   const cautions = useMemo(() => {
     const byId = new Map();
     for (const c of selected) {
-      if (c.caution && !byId.has(c.id)) byId.set(c.id, c);
+      if (c.risk === "caution" && !byId.has(c.id)) byId.set(c.id, c);
     }
     return [...byId.values()];
   }, [selected]);
@@ -325,7 +325,7 @@ export default function CachePanel({
               <ul>
                 {cautions.map((c) => (
                   <li key={c.path}>
-                    {c.label} — {c.caution}
+                    {c.label} — {c.riskNote}
                   </li>
                 ))}
               </ul>
@@ -425,8 +425,8 @@ function RuleRows({
         </td>
         <td>
           <span className="cache-label">{rule.label}</span>
-          {rule.caution && (
-            <span className="caution-flag" title={rule.caution}>
+          {rule.risk === "caution" && (
+            <span className="caution-flag" title={rule.riskNote}>
               caution
             </span>
           )}

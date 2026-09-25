@@ -7,8 +7,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { validatePack, expandPath, candidatePaths } from "./pack.js";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { validatePack, whereOf } from "./pack.js";
+import { expandPath } from "./expand.js";
+import { loadPacks } from "./load.js";
 import { screenPaths } from "../zap.js";
+
+const specOf = (entry, key) => entry.match.find((m) => m.key === key)?.spec ?? null;
 
 const entry = (over = {}) => ({
   id: "pnpm",
@@ -39,7 +46,7 @@ test("pack: one bad entry does not lose the rest", () => {
 });
 
 test("pack: an entry with no usable paths is rejected", () => {
-  const pack = validatePack({ entries: [entry({ paths: [], drivePaths: [] })] });
+  const pack = validatePack({ entries: [{ id: "x", label: "X", cost: "none" }] });
   assert.equal(pack.entries.length, 0);
   assert.match(pack.errors[0].reason, /no usable paths/);
 });
@@ -111,38 +118,6 @@ test("expand: a plain absolute path passes through", () => {
   assert.equal(expandPath("D:\\.pnpm-store", env), "D:\\.pnpm-store");
 });
 
-// --- candidates ------------------------------------------------------------
-
-const drives = ["C:\\", "D:\\"];
-
-test("candidates: drive-relative paths are tried on every drive", () => {
-  // A store can live on any volume, so "\.pnpm-store" means "check them all".
-  const paths = candidatePaths(
-    { paths: [], drivePaths: ["\\.pnpm-store"] },
-    drives,
-    env,
-  );
-  assert.deepEqual(paths, ["C:\\.pnpm-store", "D:\\.pnpm-store"]);
-});
-
-test("candidates: unresolvable templates are dropped", () => {
-  const paths = candidatePaths(
-    { paths: ["%NOPE%\\x", "~/.cargo/registry"], drivePaths: [] },
-    drives,
-    env,
-  );
-  assert.deepEqual(paths, ["C:\\Users\\dustin\\.cargo\\registry"]);
-});
-
-test("candidates: duplicates are collapsed case-insensitively", () => {
-  const paths = candidatePaths(
-    { paths: ["~/.cargo/registry", "C:\\Users\\dustin\\.CARGO\\Registry"], drivePaths: [] },
-    drives,
-    env,
-  );
-  assert.equal(paths.length, 1);
-});
-
 // --- per-project entries ---------------------------------------------------
 
 test("pack: an entry with only dirNames is valid", () => {
@@ -151,23 +126,115 @@ test("pack: an entry with only dirNames is valid", () => {
     entries: [{ id: "vite", label: "Vite deps", dirNames: [".vite"], under: "node_modules" }],
   });
   assert.equal(pack.entries.length, 1);
-  assert.deepEqual(pack.entries[0].dirNames, [".vite"]);
-  assert.equal(pack.entries[0].under, "node_modules");
+  const [vite] = pack.entries;
+  assert.deepEqual(specOf(vite, "dirNames").names.map((n) => n.pattern), [".vite"]);
+  assert.equal(specOf(vite, "under").label, "node_modules");
+  assert.equal(vite.perProject, true);
 });
 
-test("pack: `under` defaults to null when absent", () => {
+test("pack: `under` is absent when not given", () => {
   const pack = validatePack({
     entries: [{ id: "next", label: "Next build", dirNames: [".next"] }],
   });
-  assert.equal(pack.entries[0].under, null, "matches anywhere");
+  assert.equal(specOf(pack.entries[0], "under"), null, "matches anywhere");
 });
 
-test("pack: an entry with no paths and no dirNames is still rejected", () => {
+test("pack: where describes each rule for the settings list", () => {
   const pack = validatePack({
-    entries: [{ id: "x", label: "X", paths: [], drivePaths: [], dirNames: [] }],
+    entries: [{ id: "vite", label: "Vite", dirNames: [".vite"], under: "node_modules" }],
+  });
+  assert.deepEqual(whereOf(pack.entries[0]), ["folders named .vite", "inside node_modules"]);
+});
+
+// --- registry-driven validation --------------------------------------------
+
+test("pack: an unknown key is rejected, not ignored", () => {
+  // A misspelt filter would otherwise silently widen what gets deleted.
+  const pack = validatePack({
+    entries: [{ id: "t", label: "T", dirNames: ["target"], besides: ["Cargo.toml"] }],
+  });
+  assert.equal(pack.entries.length, 0);
+  assert.match(pack.errors[0].reason, /unknown key "besides"/);
+});
+
+test("pack: a filter-only entry is rejected", () => {
+  const pack = validatePack({
+    entries: [{ id: "t", label: "T", beside: ["Cargo.toml"] }],
   });
   assert.equal(pack.entries.length, 0);
   assert.match(pack.errors[0].reason, /no usable paths/);
+});
+
+test("pack: a too-broad name pattern is rejected", () => {
+  const pack = validatePack({
+    entries: [
+      { id: "a", label: "A", dirNames: ["*"] },
+      { id: "b", label: "B", dirNames: ["x"], beside: ["*.h"] },
+      { id: "c", label: "C", dirNames: ["x"], beside: ["foo*.txt"] },
+    ],
+  });
+  assert.equal(pack.entries.length, 0);
+  assert.equal(pack.errors.length, 3);
+});
+
+test("pack: a path whose last segment is a wildcard is rejected", () => {
+  // "every child of X" is never a cache; a template must name the folder.
+  const pack = validatePack({
+    entries: [{ id: "a", label: "A", paths: ["%LOCALAPPDATA%\\JetBrains\\*"] }],
+  });
+  assert.equal(pack.entries.length, 0);
+  assert.match(pack.errors[0].reason, /last segment/);
+});
+
+test("pack: caution text makes the entry risk caution", () => {
+  const pack = validatePack({
+    entries: [
+      entry({ id: "a", caution: "Slow to rebuild." }),
+      entry({ id: "b" }),
+    ],
+  });
+  assert.equal(pack.entries[0].risk, "caution");
+  assert.equal(pack.entries[0].riskNote, "Slow to rebuild.");
+  assert.equal(pack.entries[1].risk, "safe");
+  assert.equal(pack.entries[1].riskNote, null);
+});
+
+test("packs: every file in packs/ loads without error", async () => {
+  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "packs");
+  const { entries, errors } = await loadPacks(dir);
+  assert.deepEqual(errors, []);
+  assert.ok(entries.length > 80);
+});
+
+test("pack: a present key with an empty list is an error, not absent", () => {
+  const pack = validatePack({
+    entries: [
+      { id: "a", label: "A", paths: [], dirNames: ["x"] },
+      { id: "b", label: "B", dirNames: ["target"], beside: [] },
+      { id: "c", label: "C", dirNames: ["target"], beside: [""] },
+      { id: "d", label: "D", dirNames: ["target"], contains: [42] },
+      { id: "e", label: "E", dirNames: ["target", "  "] },
+    ],
+  });
+  assert.equal(pack.entries.length, 0, "a blank filter must not silently widen");
+  assert.equal(pack.errors.length, 5);
+  assert.match(pack.errors[0].reason, /paths is empty/);
+  assert.match(pack.errors[1].reason, /beside is empty/);
+  assert.match(pack.errors[2].reason, /beside has a blank or non-string/);
+  assert.match(pack.errors[3].reason, /contains has a blank or non-string/);
+});
+
+test("pack: . and .. segments are rejected at load", () => {
+  // Expansion normalizes the path, so "…\*\x\.." would end on the wildcard.
+  const pack = validatePack({
+    entries: [
+      { id: "a", label: "A", paths: ["%USERPROFILE%\\*\\x\\.."] },
+      { id: "b", label: "B", paths: ["C:\\a\\.\\b"] },
+      { id: "c", label: "C", drivePaths: ["\\x\\..\\y"] },
+    ],
+  });
+  assert.equal(pack.entries.length, 0);
+  for (const e of pack.errors) assert.match(e.reason, /"\." and "\.\." segments/);
 });
 
 // --- screening -------------------------------------------------------------

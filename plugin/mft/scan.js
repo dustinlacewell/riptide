@@ -20,6 +20,7 @@ import path from "node:path";
 import { parseBootSector } from "./boot.js";
 import { runsToByteRanges } from "./runlist.js";
 import { applyFixup, parseFileRecord, extractMftRuns } from "./record.js";
+import { markFile } from "./filenames.js";
 import {
   resolvePath,
   subtreeSizes,
@@ -27,6 +28,10 @@ import {
 } from "./tree.js";
 
 const READ_CHUNK = 8 * 1024 * 1024;
+
+// A file-name query that marks this many folders is not asking a narrow
+// question; holding the answer would cost memory the stream exists to save.
+const MAX_MARKS = 1_000_000;
 
 /**
  * @param {{root: string, matches: (name: string) => boolean,
@@ -58,7 +63,7 @@ export async function scanVolume({ root, matches, onProgress = () => {} }) {
 // ---------------------------------------------------------------------------
 
 async function scanViaMft({ drive, root, matches, onProgress }) {
-  const tree = await readVolumeTree(drive, onProgress);
+  const tree = await readVolumeTree(drive, { onProgress });
   onProgress({ stage: "tree", count: tree.dirs.size });
   return buildHits({ ...tree, drive, root, matches });
 }
@@ -70,10 +75,17 @@ async function scanViaMft({ drive, root, matches, onProgress }) {
  * tab) needs the same read but not the name matching. One sequential pass
  * over the MFT answers both questions.
  *
+ * With a file-name query (see filenames.js), each file whose name matches
+ * marks its parent directory, so a caller can ask "which folders hold a
+ * Cargo.toml?" from the same read. Without one, files cost nothing extra.
+ *
  * @param {string} drive e.g. "C:"
- * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map, drive: string}>}
+ * @param {{onProgress?: Function,
+ *          query?: {exact: Set<string>, ext: Set<string>}|null}} [opts]
+ * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map,
+ *                    marks: Map<number, Set<string>>, drive: string}>}
  */
-export async function readVolumeTree(drive, onProgress = () => {}) {
+export async function readVolumeTree(drive, { onProgress = () => {}, query = null } = {}) {
   const handle = await fsp.open(`\\\\.\\${drive}`, "r");
 
   try {
@@ -93,14 +105,15 @@ export async function readVolumeTree(drive, onProgress = () => {}) {
     );
 
     onProgress({ stage: "mft-stream" });
-    const { dirs, ownBytes, ownFiles } = await streamMftRecords({
+    const { dirs, ownBytes, ownFiles, marks } = await streamMftRecords({
       handle,
       ranges,
       boot,
+      query,
       onProgress,
     });
 
-    return { dirs, ownBytes, ownFiles, drive };
+    return { dirs, ownBytes, ownFiles, marks, drive };
   } finally {
     await handle.close();
   }
@@ -116,16 +129,18 @@ export async function readVolumeTree(drive, onProgress = () => {}) {
  * memory tracks the directory count rather than the file count.
  *
  * @returns {{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
- *            ownFiles: Map<number, number>}}
+ *            ownFiles: Map<number, number>, marks: Map<number, Set<string>>}}
  */
-async function streamMftRecords({ handle, ranges, boot, onProgress }) {
+async function streamMftRecords({ handle, ranges, boot, query, onProgress }) {
   const recordSize = boot.bytesPerFileRecord;
   const dirs = new Map();
   const ownBytes = new Map();
   const ownFiles = new Map();
+  const marks = new Map();
 
   let recordNumber = 0;
   let parsed = 0;
+  let marked = 0;
 
   for (const range of ranges) {
     let consumed = 0n;
@@ -159,6 +174,15 @@ async function streamMftRecords({ handle, ranges, boot, onProgress }) {
           // Fold into the parent's total, then let the record go.
           ownBytes.set(entry.parent, (ownBytes.get(entry.parent) ?? 0n) + entry.size);
           ownFiles.set(entry.parent, (ownFiles.get(entry.parent) ?? 0) + 1);
+
+          if (query) {
+            marked += markFile(marks, query, entry.name, entry.parent);
+            if (marked > MAX_MARKS) {
+              throw new Error(
+                `file-name query marked more than ${MAX_MARKS.toLocaleString()} folders; a pack pattern is too broad`,
+              );
+            }
+          }
         }
 
         if (++parsed % 50000 === 0) {
@@ -170,7 +194,7 @@ async function streamMftRecords({ handle, ranges, boot, onProgress }) {
     }
   }
 
-  return { dirs, ownBytes, ownFiles };
+  return { dirs, ownBytes, ownFiles, marks };
 }
 
 function buildHits({ dirs, ownBytes, ownFiles, drive, root, matches }) {

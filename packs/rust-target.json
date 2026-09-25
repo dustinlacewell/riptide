@@ -1,11 +1,13 @@
 {
-  "id": "tauri-target",
-  "label": "Tauri target dir",
-  "tool": "tauri",
+  "id": "rust-target",
+  "label": "Cargo target dir",
+  "tool": "cargo",
   "dirNames": [
     "target"
   ],
-  "under": "src-tauri",
+  "beside": [
+    "Cargo.toml"
+  ],
   "cost": "Full rebuild on the next build. These are large.",
   "pack": "rust"
 }

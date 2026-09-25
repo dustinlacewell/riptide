@@ -1,0 +1,14 @@
+{
+  "id": "unreal-ddc",
+  "label": "Unreal DDC and intermediate",
+  "tool": "unreal",
+  "dirNames": [
+    "DerivedDataCache",
+    "Intermediate"
+  ],
+  "beside": [
+    "*.uproject"
+  ],
+  "cost": "Shaders and build files regenerate when the project next opens.",
+  "pack": "gamedev"
+}

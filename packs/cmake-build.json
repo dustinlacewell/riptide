@@ -1,0 +1,14 @@
+{
+  "id": "cmake-build",
+  "label": "CMake build tree",
+  "tool": "cmake",
+  "dirNames": [
+    "build",
+    "cmake-build-*"
+  ],
+  "contains": [
+    "CMakeCache.txt"
+  ],
+  "cost": "Reconfigure and full rebuild on the next build.",
+  "pack": "misc"
+}

@@ -14,6 +14,7 @@ import { scanVolume } from "./mft/scan.js";
 import { listDirs } from "./dirs.js";
 import { loadPacks } from "./caches/load.js";
 import { resolveEntries } from "./caches/resolve.js";
+import { whereOf } from "./caches/pack.js";
 import { screenPaths, zapPaths } from "./zap.js";
 import { runRipgrep } from "./grep/run.js";
 import { parseGlobs } from "./grep/args.js";
@@ -109,12 +110,11 @@ async function cacheConfigsRoute(res) {
       tool: e.tool,
       pack: e.pack,
       cost: e.cost,
-      caution: e.caution,
+      risk: e.risk,
+      riskNote: e.riskNote,
       // What the entry looks for, so the modal can show where it searches.
-      locations: [...e.paths, ...e.drivePaths],
-      dirNames: e.dirNames,
-      under: e.under,
-      perProject: e.dirNames.length > 0,
+      where: whereOf(e),
+      perProject: e.perProject,
     })),
   });
 }
@@ -145,8 +145,7 @@ async function cachesRoute(req, res) {
   try {
     const result = await resolveEntries(entries, {
       drives,
-      // Scopes the per-project name search only. Global caches sit at fixed
-      // paths, so a root must not hide them.
+      // With a root, only its drive is read and only hits under it are kept.
       root: typeof root === "string" && root.trim() ? root : null,
       onProgress: (note) =>
         res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),

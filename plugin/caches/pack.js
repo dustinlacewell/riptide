@@ -5,23 +5,21 @@
  * pure data — paths and prose, no commands — so loading one from someone
  * else's machine runs nothing.
  *
- * Three kinds of location:
+ * An entry is a few meta fields (id, label, tool, pack, cost, caution) plus
+ * rules. Every other key names a matcher in matchers/index.js; an unknown
+ * key is an error, not something to ignore, because a misspelt filter
+ * ("besides") would otherwise silently widen what gets deleted.
  *
- *   paths       absolute once expanded ("%LOCALAPPDATA%\\pnpm\\store",
- *               "~/.cargo/registry"). Resolved once.
- *   drivePaths  anchored to a drive root ("\\.pnpm-store"). Checked against
- *               every drive, since a store may live on any of them.
- *   dirNames    a directory name that appears inside projects rather than at
- *               a fixed location (".vite", "target", ".next"). Found by name
- *               in the same MFT read that sizes everything else, so it costs
- *               nothing extra.
+ * A key that is present must hold a usable value: `"beside": []` is an
+ * error, not an absent filter.
  *
- * A dirName entry may set `under` to require a parent directory name — Vite's
- * cache is "node_modules/.vite", so `{ dirNames: [".vite"], under: "node_modules" }`
- * will not match a stray .vite elsewhere.
+ * Each entry needs at least one locate rule (paths, drivePaths, dirNames).
+ * Filter rules (under, beside, contains) narrow what those locate.
  */
 
-import path from "node:path";
+import { matcherFor, MATCHERS } from "./matchers/index.js";
+
+const META_KEYS = new Set(["id", "label", "tool", "pack", "cost", "caution"]);
 
 /**
  * Validate a parsed pack.
@@ -50,139 +48,86 @@ export function validatePack(raw, source = "pack") {
     }
   }
 
+  const packName = typeof raw.name === "string" ? raw.name : source;
   const entries = [];
   const errors = [];
   const seen = new Set();
 
   raw.entries.forEach((entry, index) => {
     const where = entry?.id ? String(entry.id) : `entry ${index}`;
-    const problem = entryProblem(entry, seen);
+    const result = parseEntry(entry, seen);
 
-    if (problem) {
-      errors.push({ entry: where, reason: problem });
+    if (result.error) {
+      errors.push({ entry: where, reason: result.error });
       return;
     }
 
     seen.add(entry.id);
-    entries.push({
-      id: entry.id,
-      label: entry.label,
-      tool: entry.tool ?? entry.id,
-      paths: (entry.paths ?? []).filter(isNonEmptyString),
-      drivePaths: (entry.drivePaths ?? []).filter(isNonEmptyString),
-      dirNames: (entry.dirNames ?? []).filter(isNonEmptyString),
-      under: isNonEmptyString(entry.under) ? entry.under : null,
-      cost: entry.cost ?? "",
-      caution: entry.caution ?? null,
-      pack: typeof raw.name === "string" ? raw.name : source,
-    });
+    entries.push({ ...result, pack: packName });
   });
 
   return {
-    name: typeof raw.name === "string" ? raw.name : source,
+    name: packName,
     description: typeof raw.description === "string" ? raw.description : "",
     entries,
     errors,
   };
 }
 
-function entryProblem(entry, seen) {
-  if (!entry || typeof entry !== "object") return "not an object";
+/**
+ * Human-readable description of each of an entry's rules, in registry order.
+ *
+ * @param {{match: Array<{key: string, spec: object}>}} entry
+ * @returns {string[]}
+ */
+export function whereOf(entry) {
+  return entry.match.map(({ key, spec }) => matcherFor(key).describe(spec));
+}
+
+// ---------------------------------------------------------------------------
+
+function parseEntry(entry, seen) {
+  const meta = metaProblem(entry, seen);
+  if (meta) return { error: meta };
+
+  const unknown = Object.keys(entry).find((k) => !META_KEYS.has(k) && !matcherFor(k));
+  if (unknown) return { error: `unknown key "${unknown}"` };
+
+  const match = [];
+  for (const matcher of MATCHERS) {
+    const value = entry[matcher.key];
+    if (value === undefined) continue;
+
+    const spec = matcher.parse(value);
+    if (spec.error) return { error: spec.error };
+    match.push({ key: matcher.key, spec });
+  }
+
+  const locators = match.map((m) => matcherFor(m.key)).filter((m) => m.role === "locate");
+  if (locators.length === 0) {
+    return { error: "no usable paths: needs paths, drivePaths or dirNames" };
+  }
+
+  const caution = typeof entry.caution === "string" && entry.caution.trim() ? entry.caution : null;
+
+  return {
+    id: entry.id,
+    label: entry.label,
+    tool: entry.tool ?? entry.id,
+    cost: entry.cost ?? "",
+    risk: caution ? "caution" : "safe",
+    riskNote: caution,
+    perProject: locators.some((m) => m.perProject),
+    match,
+  };
+}
+
+function metaProblem(entry, seen) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return "not an object";
   if (!isNonEmptyString(entry.id)) return "missing id";
   if (seen.has(entry.id)) return "duplicate id";
   if (!isNonEmptyString(entry.label)) return "missing label";
-
-  const paths = entry.paths ?? [];
-  const drivePaths = entry.drivePaths ?? [];
-  const dirNames = entry.dirNames ?? [];
-
-  if (!Array.isArray(paths) || !Array.isArray(drivePaths) || !Array.isArray(dirNames)) {
-    return "paths, drivePaths and dirNames must be arrays";
-  }
-  if (
-    paths.filter(isNonEmptyString).length === 0 &&
-    drivePaths.filter(isNonEmptyString).length === 0 &&
-    dirNames.filter(isNonEmptyString).length === 0
-  ) {
-    return "no usable paths";
-  }
   return null;
-}
-
-/**
- * Expand environment variables and ~ in a path template.
- *
- * Returns null when a referenced variable is not set — that means the path
- * cannot apply to this machine, which is ordinary (a Linux path on Windows)
- * rather than an error.
- *
- * @param {string} template
- * @param {Record<string, string|undefined>} env
- * @returns {string|null}
- */
-export function expandPath(template, env = process.env) {
-  if (!isNonEmptyString(template)) return null;
-
-  let out = template;
-
-  if (out.startsWith("~/") || out.startsWith("~\\")) {
-    const home = env.USERPROFILE ?? env.HOME;
-    if (!home) return null;
-    out = path.join(home, out.slice(2));
-  }
-
-  // %VAR% (Windows) and $VAR / ${VAR} (POSIX-style, for shared packs).
-  let missing = false;
-  out = out
-    .replace(/%([^%]+)%/g, (_, name) => {
-      const value = env[name];
-      if (value === undefined) missing = true;
-      return value ?? "";
-    })
-    .replace(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g, (_, name) => {
-      const value = env[name];
-      if (value === undefined) missing = true;
-      return value ?? "";
-    });
-
-  if (missing) return null;
-
-  return path.normalize(out);
-}
-
-/**
- * Every absolute path an entry could occupy on this machine.
- *
- * @param {object} entry a validated entry
- * @param {string[]} drives e.g. ["C:\\", "D:\\"]
- * @param {Record<string, string|undefined>} env
- * @returns {string[]}
- */
-export function candidatePaths(entry, drives, env = process.env) {
-  const out = [];
-
-  for (const template of entry.paths) {
-    const expanded = expandPath(template, env);
-    if (expanded && path.isAbsolute(expanded)) out.push(expanded);
-  }
-
-  // A drive-relative path may exist on any volume, so try them all.
-  for (const template of entry.drivePaths) {
-    const relative = template.replace(/^[\\/]+/, "");
-    if (!relative) continue;
-    for (const drive of drives) {
-      out.push(path.join(drive, relative));
-    }
-  }
-
-  // Two templates can expand to the same place on one machine.
-  const seen = new Set();
-  return out.filter((p) => {
-    const key = p.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function isNonEmptyString(value) {

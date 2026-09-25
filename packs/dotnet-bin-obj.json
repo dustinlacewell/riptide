@@ -1,0 +1,17 @@
+{
+  "id": "dotnet-bin-obj",
+  "label": ".NET bin and obj",
+  "tool": "dotnet",
+  "dirNames": [
+    "bin",
+    "obj"
+  ],
+  "beside": [
+    "*.csproj",
+    "*.fsproj",
+    "*.vbproj"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "caution": "bin can hold hand-placed files, such as config or native DLLs, that the build does not recreate.",
+  "pack": "misc"
+}
