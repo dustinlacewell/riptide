@@ -98,6 +98,28 @@ test("cache resolution reads no drive once the signal fired", async () => {
   assert.deepEqual(progress, []);
 });
 
+test("a drive read that fails as the stop lands reports the stop", async () => {
+  const controller = new AbortController();
+  const progress = [];
+
+  await assert.rejects(
+    resolveEntries([], {
+      drives: ["C:\\"],
+      root: "C:\\x",
+      signal: controller.signal,
+      onProgress: (n) => progress.push(n.stage),
+      // No volume is opened: the stand-in stops the run, then fails the way
+      // a lost handle would.
+      readTree: async () => {
+        controller.abort();
+        throw Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      },
+    }),
+    isAbort,
+  );
+  assert.ok(!progress.includes("mft-failed"), "no drive error is reported");
+});
+
 /** A stand-in for a ripgrep child process that runs until killed. */
 function stubChild() {
   const child = new EventEmitter();

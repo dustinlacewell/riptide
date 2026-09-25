@@ -55,7 +55,7 @@ export async function scanVolume({ root, matches, onProgress = () => {}, signal 
     } catch (err) {
       // A stop is not a failed MFT read; walking the tree instead would
       // carry on with the work the caller just cancelled.
-      if (signal?.aborted) throw err;
+      signal?.throwIfAborted();
       onProgress({ stage: "mft-unavailable", reason: err.message });
       const hits = await scanViaWalk({ root, matches, onProgress, signal });
       return { strategy: "walk", reason: err.message, hits };

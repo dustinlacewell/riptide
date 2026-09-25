@@ -9,28 +9,31 @@
  * worth warning about.
  */
 
+import { pathKey } from "./pathKey.js";
+
 /** @typedef {"safe"|"caution"|"refused"} Risk */
 
 const NONE = new Set();
 
 /**
  * @param {{path?: string, risk?: string}} item a scan hit or cache hit
- * @param {Set<string>} [refused] lower-cased paths the server refused
+ * @param {Set<string>} [refused] from refusedPaths
  * @returns {Risk}
  */
 export function riskOf(item, refused = NONE) {
-  if (item.path && refused.has(item.path.toLowerCase())) return "refused";
+  if (item.path && refused.has(pathKey(item.path))) return "refused";
   if (item.risk === "caution") return "caution";
   return "safe";
 }
 
 /**
- * The lookup riskOf takes, from a plan's refused list. Windows paths compare
- * without case, so the set holds them lower-cased.
+ * The lookup riskOf takes, from a plan's refused list. The server writes
+ * refused paths through path.resolve; both sides go through pathKey so a
+ * separator, trailing slash or case difference cannot hide a refusal.
  *
  * @param {Array<{path: string}>} list
  * @returns {Set<string>}
  */
 export function refusedPaths(list) {
-  return new Set((list ?? []).map((r) => r.path.toLowerCase()));
+  return new Set((list ?? []).map((r) => pathKey(r.path)));
 }

@@ -25,7 +25,8 @@ import { driveOf } from "./expand.js";
  * @param {{drives: string[], env?: object, root?: string|null,
  *          onProgress?: (n: object) => void,
  *          onFound?: (found: object[]) => void,
- *          signal?: AbortSignal}} opts
+ *          signal?: AbortSignal, readTree?: typeof readVolumeTree}} opts
+ *   readTree defaults to the real MFT read; tests pass a stand-in.
  * @returns {Promise<{found: object[], errors: string[]}>}
  *   Rejects with the signal's reason once aborted; drives already reported
  *   through onFound stay reported.
@@ -37,6 +38,7 @@ export async function resolveEntries(entries, {
   onProgress = () => {},
   onFound = () => {},
   signal,
+  readTree = readVolumeTree,
 }) {
   const ctx = { env, drives, scope: root ? normalize(root) : null };
   const query = buildNameQuery(collectNeeds(entries));
@@ -53,14 +55,15 @@ export async function resolveEntries(entries, {
 
     let volume;
     try {
-      volume = await readVolumeTree(drive, {
+      volume = await readTree(drive, {
         query,
         onProgress: (n) => onProgress({ ...n, ...where }),
         signal,
       });
     } catch (err) {
-      // A stop is not a drive that failed to read.
-      if (signal?.aborted) throw err;
+      // A stop is not a drive that failed to read. The read may have died
+      // of something else as the stop landed; the stop is what gets told.
+      signal?.throwIfAborted();
       onProgress({ stage: "mft-failed", drive, reason: err.message });
       errors.push(`${drive} could not be read: ${err.message}`);
       continue;

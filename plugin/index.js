@@ -120,8 +120,14 @@ async function cacheConfigsRoute(res) {
 }
 
 async function cachesRoute(req, res) {
+  // First, before any await: a client that leaves while the body or the
+  // packs load must still cancel the run.
+  const signal = abortOnDisconnect(res);
+
   const { disabled, root } = await body(req);
+  if (signal.aborted) return;
   const { entries: all, packs, errors } = await loadPacks();
+  if (signal.aborted) return;
 
   // Filtering here rather than in the UI means a disabled per-project rule
   // costs no MFT work at all, which is the expensive part.
@@ -141,7 +147,7 @@ async function cachesRoute(req, res) {
 
   const started = Date.now();
   const { drives } = await listRoots();
-  const signal = abortOnDisconnect(res);
+  if (signal.aborted) return;
 
   try {
     const result = await resolveEntries(entries, {
@@ -184,7 +190,10 @@ async function cachesRoute(req, res) {
 }
 
 async function scanRoute(req, res) {
+  const signal = abortOnDisconnect(res);
+
   const { root, patterns } = await body(req);
+  if (signal.aborted) return;
 
   if (!root || typeof root !== "string") {
     return json(res, 400, { error: "root is required" });
@@ -199,6 +208,7 @@ async function scanRoute(req, res) {
   } catch {
     return json(res, 400, { error: `cannot read root: ${root}` });
   }
+  if (signal.aborted) return;
 
   // NDJSON so the UI can show progress during a long scan rather than
   // staring at a spinner.
@@ -211,7 +221,6 @@ async function scanRoute(req, res) {
   const matches = (name) => wanted.has(name.toLowerCase());
 
   const started = Date.now();
-  const signal = abortOnDisconnect(res);
 
   let result;
   try {
@@ -240,7 +249,12 @@ async function scanRoute(req, res) {
 }
 
 async function grepRoute(req, res) {
+  // Stop ripgrep if the user presses Stop, navigates away or starts a new
+  // search; otherwise a broad pattern keeps a process busy for nothing.
+  const signal = abortOnDisconnect(res);
+
   const body_ = await body(req);
+  if (signal.aborted) return;
   const { root, pattern } = body_;
 
   if (!pattern || typeof pattern !== "string") {
@@ -255,15 +269,12 @@ async function grepRoute(req, res) {
   } catch {
     return json(res, 400, { error: `cannot read root: ${root}` });
   }
+  if (signal.aborted) return;
 
   res.writeHead(200, {
     "Content-Type": "application/x-ndjson",
     "Cache-Control": "no-cache",
   });
-
-  // Stop ripgrep if the user presses Stop, navigates away or starts a new
-  // search; otherwise a broad pattern keeps a process busy for nothing.
-  const signal = abortOnDisconnect(res);
 
   const started = Date.now();
 

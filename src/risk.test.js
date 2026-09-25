@@ -8,6 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { riskOf, refusedPaths } from "./risk.js";
+import { pathKey } from "./pathKey.js";
 
 test("a hit with no risk field is safe", () => {
   assert.equal(riskOf({ path: "D:\\code\\a\\node_modules" }), "safe");
@@ -29,6 +30,30 @@ test("a refused path is refused, even when the engine says caution", () => {
 test("refused paths match without case", () => {
   const refused = refusedPaths([{ path: "C:\\WINDOWS\\Temp" }]);
   assert.equal(riskOf({ path: "c:\\windows\\temp" }, refused), "refused");
+});
+
+test("refused paths match across trailing slash and case", () => {
+  const refused = refusedPaths([{ path: "C:\\Windows" }]);
+  assert.equal(riskOf({ path: "c:\\windows\\" }, refused), "refused");
+});
+
+test("refused paths match across forward slashes", () => {
+  const refused = refusedPaths([{ path: "C:\\Windows" }]);
+  assert.equal(riskOf({ path: "C:/Windows" }, refused), "refused");
+});
+
+test("refused paths match with a trailing slash on a spaced name", () => {
+  const refused = refusedPaths([{ path: "C:\\Program Files" }]);
+  assert.equal(riskOf({ path: "C:\\Program Files\\" }, refused), "refused");
+});
+
+test("pathKey writes a path the way path.resolve would, lower-cased", () => {
+  assert.equal(pathKey("c:\\windows\\"), "c:\\windows");
+  assert.equal(pathKey("C:/Windows"), "c:\\windows");
+  assert.equal(pathKey("C:\\Program Files\\"), "c:\\program files");
+  assert.equal(pathKey("C:\\a\\\\b\\.\\c\\.."), "c:\\a\\b");
+  assert.equal(pathKey("C:"), "c:\\");
+  assert.equal(pathKey("C:\\"), "c:\\");
 });
 
 test("a path not in the refused set keeps its own risk", () => {
