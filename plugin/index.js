@@ -471,7 +471,10 @@ async function mapReadRoute(req, res) {
 function mapNodeRoute(url, res) {
   const q = url.searchParams;
   const { slot, stale } = maps.at(q.get("drive") ?? "", q.get("gen"));
-  if (stale) return json(res, 409, { error: "the map changed; reload it" });
+  // The client re-roots from here: same `read` means its ids still hold.
+  if (stale) {
+    return json(res, 409, { error: "the map changed", gen: stale.gen, read: stale.read });
+  }
   if (!slot) return json(res, 404, { error: "no map for that drive" });
 
   const page = childrenPage(slot.snap, Number(q.get("id") ?? 0), {

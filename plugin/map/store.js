@@ -47,7 +47,9 @@ export function createMapStore({ max = 2, now = Date.now } = {}) {
   function publish(drive, snap, { recordsTotal = 0 } = {}) {
     const key = keyOf(drive);
     snap.gen = ++counter;
-    const slot = { drive: key, snap, gen: snap.gen, readAt: now(), recordsTotal };
+    // `read` names the snapshot; `gen` also moves when a delete changes it.
+    // Ids stay valid while `read` is the same.
+    const slot = { drive: key, snap, gen: snap.gen, read: snap.gen, readAt: now(), recordsTotal };
     slots.delete(key);
     slots.set(key, slot);
     while (slots.size > max) slots.delete(slots.keys().next().value);
@@ -67,14 +69,14 @@ export function createMapStore({ max = 2, now = Date.now } = {}) {
   /**
    * The slot for a drive at a generation.
    *
-   * @returns {{slot: object|null, stale: boolean}} stale when the drive is
-   *          held at another generation
+   * @returns {{slot: object|null, stale: object|null}} stale, when the
+   *          drive is held at another generation, is that slot
    */
   function at(drive, gen) {
     const slot = get(drive);
-    if (!slot) return { slot: null, stale: false };
-    if (slot.gen !== Number(gen)) return { slot: null, stale: true };
-    return { slot, stale: false };
+    if (!slot) return { slot: null, stale: null };
+    if (slot.gen !== Number(gen)) return { slot: null, stale: slot };
+    return { slot, stale: null };
   }
 
   /**

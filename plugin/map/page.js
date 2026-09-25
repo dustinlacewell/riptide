@@ -26,7 +26,18 @@ export function childrenPage(snap, id, { depth = 2, limit = 40 } = {}) {
   if (!validId(snap, id) || snap.flags[id] & REMOVED) return null;
   const d = clamp(depth, 1, MAX_DEPTH);
   const l = clamp(limit, 1, MAX_LIMIT);
-  return { node: describe(snap, id), ...listing(snap, id, d, l) };
+  return { node: describe(snap, id), trail: trailOf(snap, id), ...listing(snap, id, d, l) };
+}
+
+/**
+ * The node's ancestors from the drive root down, the node last.
+ *
+ * @returns {Array<{id: number, name: string}>}
+ */
+export function trailOf(snap, id) {
+  const out = [];
+  for (let a = id; a >= 0; a = snap.parentId[a]) out.push({ id: a, name: snap.names[a] });
+  return out.reverse();
 }
 
 /**

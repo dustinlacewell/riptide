@@ -3,6 +3,7 @@ import * as api from "./api.js";
 import ZapPanel from "./ZapPanel.jsx";
 import SearchPanel from "./SearchPanel.jsx";
 import CachePanel from "./CachePanel.jsx";
+import MapPanel from "./MapPanel.jsx";
 import { COLUMNS, DEFAULT_SORT } from "./sort.js";
 import { load, remember, save } from "./persist.js";
 import WaveMark from "./ui/WaveMark.jsx";
@@ -17,6 +18,11 @@ const TABS = {
     label: "Caches",
     about: "Find tool caches and build folders you can safely delete.",
     Panel: CachePanel,
+  },
+  map: {
+    label: "Map",
+    about: "See where all the space on a drive went.",
+    Panel: MapPanel,
   },
   search: {
     label: "Search",

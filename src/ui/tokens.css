@@ -18,6 +18,10 @@
   --current-wash: rgba(61, 214, 245, 0.12);
   --current-glow: rgba(61, 214, 245, 0.5);
   --still: #3a5563;
+  /* Neutral map tiles, one tint per depth; the edge separates them. */
+  --still-1: #1a2833;
+  --still-2: #243746;
+  --still-edge: #0b1117;
   --streak: rgba(11, 17, 23, 0.3);
   --hatch: rgba(11, 17, 23, 0.4);
   --safe: #4ade80;
@@ -81,6 +85,9 @@
     --current-wash: rgba(8, 145, 178, 0.12);
     --current-glow: rgba(8, 145, 178, 0.4);
     --still: #9fb3c0;
+    --still-1: #dfe8ee;
+    --still-2: #cbd8e1;
+    --still-edge: #ffffff;
     --streak: rgba(255, 255, 255, 0.3);
     --hatch: rgba(255, 255, 255, 0.4);
     --safe: #15803d;

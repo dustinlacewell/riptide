@@ -34,9 +34,9 @@ test("store: publish gives each snapshot a new generation", () => {
   const a = store.publish("C:", buildSnapshot(tree().tree));
   const b = store.publish("C:", buildSnapshot(tree().tree));
   assert.ok(b.gen > a.gen);
-  assert.equal(store.at("C:", a.gen).stale, true);
+  assert.equal(store.at("C:", a.gen).stale, b);
   assert.equal(store.at("c:", b.gen).slot, b);
-  assert.deepEqual(store.at("D:", 1), { slot: null, stale: false });
+  assert.deepEqual(store.at("D:", 1), { slot: null, stale: null });
 });
 
 test("store: holds two drives and evicts the least recently used", () => {
@@ -72,6 +72,7 @@ test("store: removePaths updates the snapshot and bumps its generation", () => {
   store.removePaths(["C:\\Users\\dustin\\code\\node_modules", "D:\\x", "C:\\missing"]);
   assert.equal(slot.snap.bytes[0], 5);
   assert.ok(slot.gen > before);
+  assert.equal(slot.read, before, "same snapshot, ids still valid");
   assert.equal(store.at("C:", slot.gen).slot, slot);
   const gen = slot.gen;
   store.removePaths(["C:\\nothing\\here"]);

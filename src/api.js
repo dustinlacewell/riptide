@@ -105,6 +105,26 @@ export async function cacheConfigs() {
   return res.json();
 }
 
+/** Read a whole drive into a space map. Resolves with the snapshot's name. */
+export function mapRead({ root }, onProgress, signal) {
+  return streamNdjson("/map/read", { root }, onProgress, signal);
+}
+
+/**
+ * One page of a space map. A map that changed since `gen` rejects with an
+ * error carrying `stale: {gen, read}`, so the caller can re-root.
+ */
+export async function mapNode({ drive, gen, id, depth = 2, limit = 40 }, { signal } = {}) {
+  const q = new URLSearchParams({ drive, gen, id, depth, limit });
+  const res = await fetch(`${BASE}/map/node?${q}`, { signal });
+  if (res.status === 409) {
+    const body = await res.json();
+    throw Object.assign(new Error(body.error), { stale: { gen: body.gen, read: body.read } });
+  }
+  if (!res.ok) throw Object.assign(new Error(await errorText(res)), { status: res.status });
+  return res.json();
+}
+
 export function zap({ token, permanent, confirmCount, onProgress }) {
   return streamNdjson("/zap", { token, permanent, confirmCount }, onProgress);
 }

@@ -79,6 +79,7 @@ async function readAndPublish({ drive, root, store, readTree, usedSpace, onProgr
   return {
     drive: slot.drive,
     gen: slot.gen,
+    read: slot.read,
     readAt: slot.readAt,
     rootId,
     stats: {

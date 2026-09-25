@@ -113,6 +113,9 @@ test("page: children, grandchildren, other bucket and own files", () => {
   assert.equal(page.other.count, 5);
   assert.equal(page.other.bytes, 100 + 101 + 102 + 103 + 104);
   assert.deepEqual(page.ownFiles, { bytes: 5, count: 1 });
+  assert.deepEqual(page.trail, [{ id: 0, name: "C:\\" }]);
+  const inner = childrenPage(snap, page.children[0].kids.children[0].id);
+  assert.deepEqual(inner.trail.map((c) => c.name), ["C:\\", "d44", "inner"]);
   assert.equal(page.children[1].kids.children.length, 0);
 });
 

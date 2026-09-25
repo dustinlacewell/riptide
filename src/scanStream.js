@@ -107,6 +107,10 @@ const STAGES = {
   }),
   index: (s) => ({ ...s, phase: "index" }),
   size: (s) => ({ ...s, phase: "size" }),
+  // The map read's steps after the MFT: marking junk is its index step,
+  // packing the snapshot its size step.
+  junk: (s) => ({ ...s, phase: "index" }),
+  compact: (s) => ({ ...s, phase: "size" }),
   "mft-unavailable": (s, n) => ({
     ...restartCount(s),
     strategy: "walk",

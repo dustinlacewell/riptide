@@ -1367,3 +1367,262 @@ button.row.up .row-name {
   font-family: var(--font-mono);
   font-size: var(--fs-body);
 }
+
+/* --- space map ----------------------------------------------------------- */
+
+.map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.map-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.map-crumb {
+  padding: 2px var(--s-2);
+}
+
+.map-crumb + .map-crumb::before {
+  content: "\\";
+  margin-right: var(--s-2);
+  color: var(--dim);
+}
+
+.map-crumb[aria-current] {
+  color: var(--text);
+  opacity: 1;
+}
+
+.map-total {
+  margin-left: auto;
+  color: var(--dim);
+}
+
+.map-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: var(--s-4);
+}
+
+.map-body[aria-busy="true"] .treemap {
+  opacity: 0.7;
+}
+
+.map-note {
+  margin: 0;
+  color: var(--dim);
+  font-size: var(--fs-body);
+}
+
+/* The drawing. Tiles are rects edged in the background colour, so the
+   gaps between them read as lines without any stroke maths. */
+
+.treemap {
+  min-width: 0;
+  transition: opacity var(--t-quick) var(--ease-out);
+}
+
+.treemap svg {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caps);
+}
+
+.map-tile-fill {
+  stroke: var(--still-edge);
+  stroke-width: 1;
+  transition: fill var(--t-quick) var(--ease-out);
+}
+
+.map-tile--still.map-tile--d1 .map-tile-fill {
+  fill: var(--still-1);
+}
+
+.map-tile--still.map-tile--d2 .map-tile-fill {
+  fill: var(--still-2);
+}
+
+.map-tile--safe .map-tile-fill {
+  fill: var(--safe);
+}
+
+.map-tile--caution .map-tile-fill {
+  fill: var(--caution);
+}
+
+.map-tile--refused .map-tile-fill {
+  fill: var(--refused-wash);
+}
+
+.map-tile--gap .map-tile-fill,
+.map-tile--other .map-tile-fill,
+.map-tile--files .map-tile-fill {
+  fill: var(--raised);
+}
+
+.map-tile-head {
+  fill: var(--still-edge);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.map-tile-hatch {
+  fill: url(#map-hatch);
+  pointer-events: none;
+}
+
+.map-hatch-line {
+  stroke: var(--refused);
+  stroke-width: 1.5;
+}
+
+.map-tile-strip {
+  pointer-events: none;
+}
+
+.map-tile-strip--safe {
+  fill: var(--safe);
+}
+
+.map-tile-strip--caution {
+  fill: var(--caution);
+}
+
+.map-tile-label {
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.map-tile--safe .map-tile-label,
+.map-tile--caution .map-tile-label {
+  fill: var(--on-accent);
+}
+
+.map-tile-size {
+  opacity: 0.7;
+}
+
+.map-tile.is-drillable {
+  cursor: pointer;
+}
+
+/* --current is kept for hover, focus and selection only. */
+.map-tile.is-hovered > .map-tile-fill {
+  stroke: var(--current);
+  stroke-width: 2;
+}
+
+.map-tile.is-selected > .map-tile-fill {
+  stroke: var(--current);
+  stroke-width: 3;
+}
+
+/* The ranked list. */
+
+.map-list ol {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-rows: auto 3px;
+  align-items: center;
+  column-gap: var(--s-2);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-sm);
+}
+
+.map-row.is-hovered {
+  background: var(--current-wash);
+}
+
+.map-row.is-selected {
+  box-shadow: inset 3px 0 0 var(--current);
+}
+
+.map-row--misc {
+  grid-template-columns: minmax(0, 1fr) auto;
+  color: var(--dim);
+}
+
+.map-row-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.map-row-open[aria-disabled="true"] {
+  cursor: default;
+}
+
+.map-row-open:focus-visible {
+  outline: 2px solid var(--current);
+  outline-offset: 2px;
+}
+
+.map-row-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.map-row-label {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+}
+
+.map-row-size {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  color: var(--dim);
+}
+
+.map-row-bar {
+  grid-column: 2 / 4;
+  height: 3px;
+  background: var(--line);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.map-row-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--still);
+}
+
+.map-row--safe .map-row-bar > span {
+  background: var(--safe);
+}
+
+.map-row--caution .map-row-bar > span {
+  background: var(--caution);
+}
+
+.map-row--refused .map-row-name {
+  color: var(--dim);
+}
