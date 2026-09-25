@@ -6,17 +6,21 @@
 import path from "node:path";
 
 import { capture } from "./run.js";
-import { findExe } from "./spawn.js";
+import { fileExists, findExe } from "./spawn.js";
 
 const PROBE_TIMEOUT_MS = 30 * 1000;
 
-/** @returns {Promise<string|null>} */
-export function findDocker(env) {
+/**
+ * Docker Desktop's own CLI first, then PATH. The server runs elevated, so
+ * a docker.exe planted early on PATH should not win over the installed one.
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function findDocker(env, { isFile = fileExists } = {}) {
   const programFiles = env.ProgramFiles ?? env.PROGRAMFILES ?? "C:\\Program Files";
-  return findExe("docker", {
-    env,
-    known: [path.win32.join(programFiles, "Docker", "Docker", "resources", "bin", "docker.exe")],
-  });
+  const installed = path.win32.join(programFiles, "Docker", "Docker", "resources", "bin", "docker.exe");
+  if (await isFile(installed)) return installed;
+  return findExe("docker", { env, isFile });
 }
 
 /**

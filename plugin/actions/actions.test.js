@@ -25,7 +25,7 @@ import wslCompact, {
 } from "./wsl-compact.js";
 import { runAction, runStep } from "./run.js";
 import windowsComponentCleanup from "./windows-component-cleanup.js";
-import { parseDockerSize } from "./docker.js";
+import { findDocker, parseDockerSize } from "./docker.js";
 
 async function tempDir(t) {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "riptide-actions-"));
@@ -157,6 +157,18 @@ test("docker: unavailable without the CLI, or with the daemon down", async (t) =
   const result = await dockerImagePrune.detect(down.ctx);
   assert.equal(result.available, false);
   assert.equal(result.reason, "Docker is not running");
+});
+
+test("docker: the installed CLI under Program Files wins over PATH", async () => {
+  const installed = "C:\\PF\\Docker\\Docker\\resources\\bin\\docker.exe";
+  const planted = "C:\\early\\docker.exe";
+  const env = { PATH: "C:\\early", ProgramFiles: "C:\\PF" };
+
+  const both = new Set([installed, planted]);
+  assert.equal(await findDocker(env, { isFile: async (p) => both.has(p) }), installed);
+
+  const pathOnly = new Set([planted]);
+  assert.equal(await findDocker(env, { isFile: async (p) => pathOnly.has(p) }), planted);
 });
 
 test("docker sizes: decimal units, percentages ignored, junk is null", () => {
