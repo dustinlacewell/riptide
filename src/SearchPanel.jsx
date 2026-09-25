@@ -1,7 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "./api.js";
 import FileResult from "./FileResult.jsx";
 import RootField from "./RootField.jsx";
+import Callout from "./ui/Callout.jsx";
+import { useStoppable } from "./useStoppable.js";
 
 /**
  * The Search tab: ripgrep over the same root the Zap tab scans.
@@ -17,6 +19,7 @@ export default function SearchPanel({
   roots,
   prefs,
   onPrefsChange,
+  onBusy,
 }) {
   const [pattern, setPattern] = useState(prefs.pattern ?? "");
   const [globs, setGlobs] = useState(prefs.globs ?? "");
@@ -31,11 +34,13 @@ export default function SearchPanel({
   // Each search gets a token; results from an abandoned one are dropped so a
   // slow earlier search cannot overwrite a newer one's results.
   const runId = useRef(0);
+  const run = useStoppable();
 
   const search = useCallback(async () => {
     if (!pattern.trim() || !root) return;
 
     const id = ++runId.current;
+    const signal = run.begin();
     setSearching(true);
     setError(null);
     setSummary(null);
@@ -62,6 +67,7 @@ export default function SearchPanel({
           batch.push(file);
           flushing ??= setTimeout(flush, 100);
         },
+        signal,
       );
 
       if (id !== runId.current) return;
@@ -71,11 +77,17 @@ export default function SearchPanel({
       if (done.error) setError(done.error);
       else setSummary(done);
     } catch (e) {
-      if (id === runId.current) setError(e.message);
+      if (id !== runId.current) return;
+      // A stop keeps what already streamed in, including the last batch.
+      if (flushing) clearTimeout(flushing);
+      flush();
+      if (!run.settle(e, signal)) setError(e.message);
     } finally {
       if (id === runId.current) setSearching(false);
     }
-  }, [pattern, globs, caseMode, regex, root, onPrefsChange]);
+  }, [pattern, globs, caseMode, regex, root, onPrefsChange, run]);
+
+  useEffect(() => onBusy?.(searching), [searching, onBusy]);
 
   const totalMatches = files.reduce((sum, f) => sum + f.matches, 0);
 
@@ -137,7 +149,10 @@ export default function SearchPanel({
         >
           {searching ? "Searching…" : "Search"}
         </button>
+        {searching && <button onClick={run.stop}>Stop</button>}
       </section>
+
+      {run.stopped && !searching && <Callout tone="info">Stopped.</Callout>}
 
       {error && <p className="error">{error}</p>}
 

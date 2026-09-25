@@ -11,6 +11,10 @@
  *          never descend into the matched subtree. Always available.
  *
  * scanVolume() tries mft and falls back to walk, reporting which ran.
+ *
+ * Every loop takes an optional AbortSignal and checks it between chunks or
+ * directory levels. An aborted run throws the signal's reason, closes what
+ * it opened, and never falls back to the other strategy.
  */
 
 import fs from "node:fs";
@@ -35,26 +39,30 @@ const MAX_MARKS = 1_000_000;
 
 /**
  * @param {{root: string, matches: (name: string) => boolean,
- *          onProgress?: (n: {stage: string, count?: number}) => void}} opts
+ *          onProgress?: (n: {stage: string, count?: number}) => void,
+ *          signal?: AbortSignal}} opts
  * @returns {Promise<{strategy: "mft"|"walk", reason?: string,
  *                    hits: Array<{path: string, bytes: string, files: number,
  *                                 mtime: string|null}>}>}
  */
-export async function scanVolume({ root, matches, onProgress = () => {} }) {
+export async function scanVolume({ root, matches, onProgress = () => {}, signal }) {
   const drive = driveLetterOf(root);
 
   if (drive) {
     try {
-      const hits = await scanViaMft({ drive, root, matches, onProgress });
+      const hits = await scanViaMft({ drive, root, matches, onProgress, signal });
       return { strategy: "mft", hits };
     } catch (err) {
+      // A stop is not a failed MFT read; walking the tree instead would
+      // carry on with the work the caller just cancelled.
+      if (signal?.aborted) throw err;
       onProgress({ stage: "mft-unavailable", reason: err.message });
-      const hits = await scanViaWalk({ root, matches, onProgress });
+      const hits = await scanViaWalk({ root, matches, onProgress, signal });
       return { strategy: "walk", reason: err.message, hits };
     }
   }
 
-  const hits = await scanViaWalk({ root, matches, onProgress });
+  const hits = await scanViaWalk({ root, matches, onProgress, signal });
   return { strategy: "walk", reason: "root is not a drive path", hits };
 }
 
@@ -62,8 +70,8 @@ export async function scanVolume({ root, matches, onProgress = () => {} }) {
 // MFT strategy
 // ---------------------------------------------------------------------------
 
-async function scanViaMft({ drive, root, matches, onProgress }) {
-  const tree = await readVolumeTree(drive, { onProgress });
+async function scanViaMft({ drive, root, matches, onProgress, signal }) {
+  const tree = await readVolumeTree(drive, { onProgress, signal });
   onProgress({ stage: "tree", count: tree.dirs.size });
   return buildHits({ ...tree, drive, root, matches });
 }
@@ -81,11 +89,16 @@ async function scanViaMft({ drive, root, matches, onProgress }) {
  *
  * @param {string} drive e.g. "C:"
  * @param {{onProgress?: Function,
- *          query?: {exact: Set<string>, ext: Set<string>}|null}} [opts]
+ *          query?: {exact: Set<string>, ext: Set<string>}|null,
+ *          signal?: AbortSignal}} [opts]
  * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map,
  *                    marks: Map<number, Set<string>>, drive: string}>}
  */
-export async function readVolumeTree(drive, { onProgress = () => {}, query = null } = {}) {
+export async function readVolumeTree(
+  drive,
+  { onProgress = () => {}, query = null, signal } = {},
+) {
+  signal?.throwIfAborted();
   const handle = await fsp.open(`\\\\.\\${drive}`, "r");
 
   try {
@@ -111,6 +124,7 @@ export async function readVolumeTree(drive, { onProgress = () => {}, query = nul
       boot,
       query,
       onProgress,
+      signal,
     });
 
     return { dirs, ownBytes, ownFiles, marks, drive };
@@ -131,7 +145,7 @@ export async function readVolumeTree(drive, { onProgress = () => {}, query = nul
  * @returns {{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
  *            ownFiles: Map<number, number>, marks: Map<number, Set<string>>}}
  */
-async function streamMftRecords({ handle, ranges, boot, query, onProgress }) {
+async function streamMftRecords({ handle, ranges, boot, query, onProgress, signal }) {
   const recordSize = boot.bytesPerFileRecord;
   const dirs = new Map();
   const ownBytes = new Map();
@@ -146,6 +160,7 @@ async function streamMftRecords({ handle, ranges, boot, query, onProgress }) {
     let consumed = 0n;
 
     while (consumed < range.length) {
+      signal?.throwIfAborted();
       const remaining = range.length - consumed;
       const want = remaining < BigInt(READ_CHUNK) ? Number(remaining) : READ_CHUNK;
       const chunk = await readAt(handle, range.offset + consumed, want);
@@ -233,7 +248,7 @@ function buildHits({ dirs, ownBytes, ownFiles, drive, root, matches }) {
 // Walk strategy
 // ---------------------------------------------------------------------------
 
-async function scanViaWalk({ root, matches, onProgress }) {
+export async function scanViaWalk({ root, matches, onProgress = () => {}, signal }) {
   const found = [];
   let level = [root];
   let visited = 0;
@@ -241,6 +256,7 @@ async function scanViaWalk({ root, matches, onProgress }) {
   // Find every match first, then size them. Sizing is the expensive half and
   // is better done in one concurrent batch than interleaved with the walk.
   while (level.length > 0) {
+    signal?.throwIfAborted();
     const reads = await Promise.all(level.map(readDirSafe));
     const next = [];
 
@@ -268,7 +284,8 @@ async function scanViaWalk({ root, matches, onProgress }) {
 
   const hits = [];
   for (const batch of chunk(found, 8)) {
-    hits.push(...(await Promise.all(batch.map(measureSubtree))));
+    signal?.throwIfAborted();
+    hits.push(...(await Promise.all(batch.map((dir) => measureSubtree(dir, signal)))));
     onProgress({ stage: "sizing", count: hits.length });
   }
 
@@ -289,7 +306,7 @@ function* chunk(items, size) {
  * directories are read a level at a time so sibling reads overlap, and the
  * stats for one directory's files are issued together rather than serially.
  */
-async function measureSubtree(root) {
+async function measureSubtree(root, signal) {
   let bytes = 0n;
   let files = 0;
   let mtime = null;
@@ -303,6 +320,7 @@ async function measureSubtree(root) {
   let level = [root];
 
   while (level.length > 0) {
+    signal?.throwIfAborted();
     const reads = await Promise.all(level.map(readDirSafe));
     const next = [];
     const statJobs = [];

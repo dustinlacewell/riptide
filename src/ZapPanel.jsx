@@ -10,6 +10,7 @@ import SortHeader from "./ui/SortHeader.jsx";
 import { riskOf } from "./risk.js";
 import { COLUMNS, DEFAULT_SORT, nextSort, sortHits } from "./sort.js";
 import { useRowPainter } from "./useRowPainter.js";
+import { useStoppable } from "./useStoppable.js";
 import { useZapFlow } from "./useZapFlow.js";
 
 /**
@@ -24,6 +25,7 @@ export default function ZapPanel({
   roots,
   prefs,
   onPrefsChange,
+  onBusy,
 }) {
   const [patterns, setPatterns] = useState(prefs.patterns ?? "node_modules");
 
@@ -44,6 +46,7 @@ export default function ZapPanel({
   }, []);
 
   const flow = useZapFlow(onDeleted);
+  const run = useStoppable();
 
   useEffect(() => {
     onPrefsChange({ patterns, sort });
@@ -66,7 +69,11 @@ export default function ZapPanel({
     [selected],
   );
 
+  const busy = scanning || flow.planning || flow.zapping !== null;
+  useEffect(() => onBusy?.(busy), [busy, onBusy]);
+
   async function runScan() {
+    const signal = run.begin();
     setScanning(true);
     flow.setError(null);
     setResult(null);
@@ -76,10 +83,15 @@ export default function ZapPanel({
 
     try {
       setResult(
-        await api.scan({ root, patterns, onProgress: (n) => setProgress(n) }),
+        await api.scan({
+          root,
+          patterns,
+          signal,
+          onProgress: (n) => setProgress(n),
+        }),
       );
     } catch (e) {
-      flow.setError(e.message);
+      if (!run.settle(e, signal)) flow.setError(e.message);
     } finally {
       setScanning(false);
       setProgress(null);
@@ -130,7 +142,10 @@ export default function ZapPanel({
         <button className="primary" onClick={runScan} disabled={scanning || !root}>
           {scanning ? "Scanning…" : "Scan"}
         </button>
+        {scanning && <button onClick={run.stop}>Stop</button>}
       </section>
+
+      {run.stopped && !scanning && <Callout tone="info">Stopped.</Callout>}
 
       {progress && (
         <p className="status">

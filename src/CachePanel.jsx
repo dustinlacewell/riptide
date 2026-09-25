@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
 import { bytes, sumBytes } from "./format.js";
 import { riskOf } from "./risk.js";
@@ -10,6 +10,7 @@ import RootField from "./RootField.jsx";
 import Callout from "./ui/Callout.jsx";
 import Glyph from "./ui/Glyph.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
+import { useStoppable } from "./useStoppable.js";
 import { useZapFlow } from "./useZapFlow.js";
 import { useRowPainter } from "./useRowPainter.js";
 import { CACHE_GROUP_COLUMNS, DEFAULT_SORT, nextSort } from "./sort.js";
@@ -30,6 +31,7 @@ export default function CachePanel({
   roots,
   prefs,
   onPrefsChange,
+  onBusy,
 }) {
   // prefs.disabledCaches is a fresh array each render, so scan would be
   // rebuilt every time if it depended on the array itself. The joined key is
@@ -68,8 +70,13 @@ export default function CachePanel({
   }, []);
 
   const flow = useZapFlow(onDeleted);
+  const run = useStoppable();
+
+  const busy = loading || flow.planning || flow.zapping !== null;
+  useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
   const scan = useCallback(async () => {
+    const signal = run.begin();
     setLoading(true);
     flow.setError(null);
     flow.setOutcome(null);
@@ -96,18 +103,19 @@ export default function CachePanel({
         }
 
         setProgress(note);
-      });
+      }, signal);
 
       setProblems(done.errors ?? []);
       setSummary(done);
       if (done.failure) flow.setError(done.failure);
     } catch (e) {
-      flow.setError(e.message);
+      // A stop keeps the drives that already reported.
+      if (!run.settle(e, signal)) flow.setError(e.message);
     } finally {
       setLoading(false);
       setProgress(null);
     }
-  }, [flow, disabled, root]);
+  }, [flow, run, disabled, root]);
 
   // Grouping and sorting happen at render, not on arrival, so re-sorting
   // never has to wait for another scan.
@@ -206,9 +214,12 @@ export default function CachePanel({
         <button className="primary" onClick={scan} disabled={loading}>
           {loading ? "Looking…" : summary ? "Rescan" : "Find caches"}
         </button>
+        {loading && <button onClick={run.stop}>Stop</button>}
       </section>
 
-      {!summary && !loading && (
+      {run.stopped && !loading && <Callout tone="info">Stopped.</Callout>}
+
+      {!summary && !loading && !run.stopped && (
         <Callout tone="info">
           Searches under the root only. Reads that drive's MFT, so expect a
           minute or two.

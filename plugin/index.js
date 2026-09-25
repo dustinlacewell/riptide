@@ -141,10 +141,12 @@ async function cachesRoute(req, res) {
 
   const started = Date.now();
   const { drives } = await listRoots();
+  const signal = abortOnDisconnect(res);
 
   try {
     const result = await resolveEntries(entries, {
       drives,
+      signal,
       // With a root, only its drive is read and only hits under it are kept.
       root: typeof root === "string" && root.trim() ? root : null,
       onProgress: (note) =>
@@ -163,6 +165,8 @@ async function cachesRoute(req, res) {
       }) + "\n",
     );
   } catch (err) {
+    // The client stopped the run and is no longer listening.
+    if (signal.aborted) return;
     res.write(
       // A crash here is a fault in the scan, not a malformed pack. Reporting
       // it under "pack issues" sends anyone debugging to the wrong place.
@@ -207,11 +211,21 @@ async function scanRoute(req, res) {
   const matches = (name) => wanted.has(name.toLowerCase());
 
   const started = Date.now();
-  const result = await scanVolume({
-    root,
-    matches,
-    onProgress: (note) => res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
-  });
+  const signal = abortOnDisconnect(res);
+
+  let result;
+  try {
+    result = await scanVolume({
+      root,
+      matches,
+      signal,
+      onProgress: (note) => res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
+    });
+  } catch (err) {
+    // The client stopped the run and is no longer listening.
+    if (signal.aborted) return;
+    throw err;
+  }
 
   res.write(
     JSON.stringify({
@@ -247,10 +261,9 @@ async function grepRoute(req, res) {
     "Cache-Control": "no-cache",
   });
 
-  // Stop ripgrep if the browser navigates away or the user starts a new
+  // Stop ripgrep if the user presses Stop, navigates away or starts a new
   // search; otherwise a broad pattern keeps a process busy for nothing.
-  const controller = new AbortController();
-  res.on("close", () => controller.abort());
+  const signal = abortOnDisconnect(res);
 
   const started = Date.now();
 
@@ -268,10 +281,11 @@ async function grepRoute(req, res) {
       {
         onGroup: (group) =>
           res.write(JSON.stringify({ type: "file", ...group }) + "\n"),
-        signal: controller.signal,
+        signal,
       },
     );
 
+    if (signal.aborted) return;
     res.write(
       JSON.stringify({
         type: "done",
@@ -419,6 +433,19 @@ function body(req) {
     });
     req.on("error", reject);
   });
+}
+
+/**
+ * A signal that aborts when the client goes away before the response is
+ * finished — the Stop button, a closed tab, a new run. 'close' also fires
+ * after a normal end, which must not count as a stop.
+ */
+function abortOnDisconnect(res) {
+  const controller = new AbortController();
+  res.on("close", () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  return controller.signal;
 }
 
 function json(res, status, payload) {

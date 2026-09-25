@@ -76,12 +76,44 @@ button.tab.active {
   border-bottom-color: var(--text);
 }
 
+/* A background tab that is still working. */
+.tab-busy {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: var(--s-2);
+  vertical-align: middle;
+  border-radius: var(--r-pill);
+  background: var(--current);
+  animation: tab-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes tab-pulse {
+  50% {
+    transform: scale(1.6);
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-busy {
+    animation: none;
+  }
+}
+
 .app {
   padding: var(--s-5);
 }
 
-.app > * + * {
+.app > * + *,
+.tab-panel > * + * {
   margin-top: var(--s-4);
+}
+
+.tab-about {
+  margin: 0;
+  color: var(--dim);
+  font-size: var(--fs-body);
 }
 
 /* --- controls ------------------------------------------------------------ */

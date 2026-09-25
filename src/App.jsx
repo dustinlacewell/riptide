@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
 import ZapPanel from "./ZapPanel.jsx";
 import SearchPanel from "./SearchPanel.jsx";
@@ -8,10 +8,24 @@ import { load, remember, save } from "./persist.js";
 import WaveMark from "./ui/WaveMark.jsx";
 
 const TABS = {
-  zap: { label: "Zap", tagline: "Find build junk. Keep what you need. Zap the rest." },
-  search: { label: "Search", tagline: "ripgrep across the tree, grouped by file." },
-  caches: { label: "Caches", tagline: "Known tool caches, found by path." },
+  zap: {
+    label: "Zap",
+    about: "Find folders by name and send them to the Recycle Bin.",
+    Panel: ZapPanel,
+  },
+  caches: {
+    label: "Caches",
+    about: "Find tool caches and build folders you can safely delete.",
+    Panel: CachePanel,
+  },
+  search: {
+    label: "Search",
+    about: "Search file contents with ripgrep.",
+    Panel: SearchPanel,
+  },
 };
+
+const TAB_KEYS = Object.keys(TABS);
 
 const DEFAULTS = {
   root: "",
@@ -29,18 +43,22 @@ const DEFAULTS = {
 const SORT_KEYS = Object.keys(COLUMNS);
 
 /**
- * Shell around the two tabs. It owns what they share — the root directory,
- * the drive list, and persisted preferences — so switching tabs keeps the
- * root you were working under.
+ * Shell around the tabs. It owns what they share — the root directory, the
+ * drive list, and persisted preferences — so switching tabs keeps the root
+ * you were working under.
+ *
+ * Every panel stays mounted; switching tabs only hides the others. A scan
+ * or search keeps running in a hidden tab, and its tab shows a busy mark.
  */
 export default function App() {
   const [prefs, setPrefs] = useState(() => load(DEFAULTS, SORT_KEYS));
 
-  const [tab, setTab] = useState(prefs.tab);
+  const [tab, setTab] = useState(TABS[prefs.tab] ? prefs.tab : "zap");
   const [root, setRoot] = useState(prefs.root);
   const [recentRoots, setRecentRoots] = useState(prefs.recentRoots ?? []);
   const [roots, setRoots] = useState(null);
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState({});
 
   useEffect(() => {
     api
@@ -57,6 +75,19 @@ export default function App() {
   const onPrefsChange = useCallback((patch) => {
     setPrefs((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  // One stable reporter per tab, so a panel's busy effect runs only when
+  // its own busy flag changes.
+  const reportBusy = useMemo(
+    () =>
+      Object.fromEntries(
+        TAB_KEYS.map((key) => [
+          key,
+          (value) => setBusy((prev) => (prev[key] === value ? prev : { ...prev, [key]: value })),
+        ]),
+      ),
+    [],
+  );
 
   // A deliberate pick — from the browser or a shortcut — joins the recent
   // list. Typing in the field does not: half-written paths are not places
@@ -80,27 +111,46 @@ export default function App() {
           <span>riptide</span>
         </div>
 
-        <nav className="tabs" aria-label="Tools">
-          {Object.entries(TABS).map(([key, { label, tagline }]) => (
+        <div className="tabs" role="tablist" aria-label="Tools">
+          {TAB_KEYS.map((key) => (
             <button
               key={key}
+              id={`tab-${key}`}
+              role="tab"
+              aria-selected={tab === key}
+              aria-controls={`panel-${key}`}
               className={`tab${tab === key ? " active" : ""}`}
-              aria-current={tab === key ? "page" : undefined}
-              title={tagline}
               onClick={() => setTab(key)}
             >
-              {label}
+              {TABS[key].label}
+              {busy[key] && tab !== key && (
+                <span className="tab-busy" role="status" aria-label="working" />
+              )}
             </button>
           ))}
-        </nav>
+        </div>
       </header>
 
       <main className="app">
+        <p className="tab-about">{TABS[tab].about}</p>
+
         {error && <p className="error">{error}</p>}
 
-        {tab === "zap" && <ZapPanel {...shared} />}
-        {tab === "search" && <SearchPanel {...shared} />}
-        {tab === "caches" && <CachePanel {...shared} />}
+        {TAB_KEYS.map((key) => {
+          const { Panel } = TABS[key];
+          return (
+            <section
+              key={key}
+              id={`panel-${key}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${key}`}
+              className="tab-panel"
+              hidden={tab !== key}
+            >
+              <Panel {...shared} onBusy={reportBusy[key]} />
+            </section>
+          );
+        })}
       </main>
     </>
   );

@@ -15,21 +15,29 @@ export async function getDirs(path, { signal } = {}) {
 
 /**
  * Stream a scan. Calls onProgress for each progress line and resolves with
- * the final result.
+ * the final result. Aborting the signal drops the connection, which stops
+ * the server's work too.
  */
-export function scan({ root, patterns, onProgress }) {
-  return streamNdjson("/scan", { root, patterns }, onProgress);
+export function scan({ root, patterns, onProgress, signal }) {
+  return streamNdjson("/scan", { root, patterns }, onProgress, signal);
+}
+
+/** True for the rejection an aborted request produces. */
+export function isAbort(err) {
+  return err?.name === "AbortError";
 }
 
 /**
  * POST a request whose response is a stream of JSON lines: any number of
- * progress notes, then exactly one line of type "done".
+ * progress notes, then exactly one line of type "done". An aborted signal
+ * rejects with an AbortError at whatever point the stream had reached.
  */
-async function streamNdjson(endpoint, payload, onProgress) {
+async function streamNdjson(endpoint, payload, onProgress, signal) {
   const res = await fetch(`${BASE}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
   if (!res.ok) throw new Error(await errorText(res));
 
@@ -74,15 +82,20 @@ export async function plan(paths, bytes) {
  * Stream a ripgrep search. onFile fires per matching file as results
  * arrive, so the list fills in rather than appearing all at once.
  */
-export function grep(options, onFile) {
-  return streamNdjson("/grep", options, (note) => {
-    if (note.type === "file") onFile(note);
-  });
+export function grep(options, onFile, signal) {
+  return streamNdjson(
+    "/grep",
+    options,
+    (note) => {
+      if (note.type === "file") onFile(note);
+    },
+    signal,
+  );
 }
 
 /** Enumerate caches from the loaded packs, skipping any disabled ids. */
-export function caches({ disabled, root }, onProgress) {
-  return streamNdjson("/caches", { disabled, root }, onProgress);
+export function caches({ disabled, root }, onProgress, signal) {
+  return streamNdjson("/caches", { disabled, root }, onProgress, signal);
 }
 
 /** Every known cache config, enabled or not, for the settings modal. */

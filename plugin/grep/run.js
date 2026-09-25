@@ -35,14 +35,19 @@ export function ripgrepCandidates(env = process.env) {
  * @param {{onGroup: (group: object) => void,
  *          onSummary?: (s: object) => void,
  *          maxFiles?: number,
- *          signal?: AbortSignal}} handlers
+ *          signal?: AbortSignal,
+ *          spawnChild?: (args: string[]) => import("node:child_process").ChildProcess|null}} handlers
+ *   spawnChild is the seam for tests; it defaults to the real ripgrep.
  * @returns {Promise<{files: number, truncated: boolean, elapsedMs: number}>}
  */
-export function runRipgrep(opts, { onGroup, onSummary, maxFiles = DEFAULT_MAX_FILES, signal }) {
+export function runRipgrep(
+  opts,
+  { onGroup, onSummary, maxFiles = DEFAULT_MAX_FILES, signal, spawnChild = spawnRipgrep },
+) {
   const args = buildArgs(opts);
 
   return new Promise((resolve, reject) => {
-    const child = spawnRipgrep(args);
+    const child = spawnChild(args);
     if (!child) {
       reject(new Error("ripgrep not found — install it and restart the dev server"));
       return;
@@ -59,7 +64,9 @@ export function runRipgrep(opts, { onGroup, onSummary, maxFiles = DEFAULT_MAX_FI
     const stop = () => {
       if (!child.killed) child.kill();
     };
-    signal?.addEventListener("abort", stop, { once: true });
+    // An abort that landed before the spawn fires no event, so check first.
+    if (signal?.aborted) stop();
+    else signal?.addEventListener("abort", stop, { once: true });
 
     child.stdout.on("data", (chunk) => {
       buffer += chunk;

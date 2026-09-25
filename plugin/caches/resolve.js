@@ -24,8 +24,11 @@ import { driveOf } from "./expand.js";
  * @param {object[]} entries validated pack entries
  * @param {{drives: string[], env?: object, root?: string|null,
  *          onProgress?: (n: object) => void,
- *          onFound?: (found: object[]) => void}} opts
+ *          onFound?: (found: object[]) => void,
+ *          signal?: AbortSignal}} opts
  * @returns {Promise<{found: object[], errors: string[]}>}
+ *   Rejects with the signal's reason once aborted; drives already reported
+ *   through onFound stay reported.
  */
 export async function resolveEntries(entries, {
   drives,
@@ -33,6 +36,7 @@ export async function resolveEntries(entries, {
   root = null,
   onProgress = () => {},
   onFound = () => {},
+  signal,
 }) {
   const ctx = { env, drives, scope: root ? normalize(root) : null };
   const query = buildNameQuery(collectNeeds(entries));
@@ -42,6 +46,7 @@ export async function resolveEntries(entries, {
   const errors = [];
 
   for (const [index, drive] of queue.entries()) {
+    signal?.throwIfAborted();
     // Position in the queue, so a long read can say how much is left.
     const where = { drive, driveIndex: index + 1, driveCount: queue.length };
     onProgress({ stage: "reading-mft", ...where });
@@ -51,8 +56,11 @@ export async function resolveEntries(entries, {
       volume = await readVolumeTree(drive, {
         query,
         onProgress: (n) => onProgress({ ...n, ...where }),
+        signal,
       });
     } catch (err) {
+      // A stop is not a drive that failed to read.
+      if (signal?.aborted) throw err;
       onProgress({ stage: "mft-failed", drive, reason: err.message });
       errors.push(`${drive} could not be read: ${err.message}`);
       continue;
