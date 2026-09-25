@@ -14,10 +14,11 @@ import path from "node:path";
 
 import { readVolumeTree } from "../mft/scan.js";
 import { buildNameQuery } from "../mft/filenames.js";
-import { childIndex, subtreeSizes } from "../mft/tree.js";
+import { childIndex, resolvePath, subtreeSizes } from "../mft/tree.js";
 import { matcherFor } from "./matchers/index.js";
-import { collectNeeds } from "./needs.js";
+import { collectNeeds, projectNeeds } from "./needs.js";
 import { matchTree } from "./match.js";
+import { projectsOf } from "./projects.js";
 import { driveOf } from "./expand.js";
 
 /**
@@ -41,7 +42,7 @@ export async function resolveEntries(entries, {
   readTree = readVolumeTree,
 }) {
   const ctx = { env, drives, scope: root ? normalize(root) : null };
-  const query = buildNameQuery(collectNeeds(entries));
+  const query = buildNameQuery([...collectNeeds(entries), ...projectNeeds(entries)]);
   const queue = drivesToRead(entries, ctx, root);
 
   const found = [];
@@ -76,7 +77,8 @@ export async function resolveEntries(entries, {
     errors.push(...refused.map((r) => `${r.path} refused: ${r.reason}`));
 
     onProgress({ stage: "size", ...where });
-    const sized = sizeHits(volume, children, hits);
+    const projects = projectsOf(tree, volume.ownLatest, hits.map((h) => h.record));
+    const sized = sizeHits(volume, children, hits, (hit) => projectOfHit(tree, projects, hit));
 
     // This drive is finished; hand its results over rather than holding them
     // until every other drive has been read.
@@ -117,7 +119,7 @@ function drivesToRead(entries, ctx, root) {
   return all.filter((d) => wanted.has(d));
 }
 
-function sizeHits(volume, children, hits) {
+function sizeHits(volume, children, hits, projectFor) {
   const totals = subtreeSizes(
     volume.dirs,
     volume.ownBytes,
@@ -130,12 +132,25 @@ function sizeHits(volume, children, hits) {
   for (const hit of hits) {
     const total = totals.get(hit.record.recordNumber);
     if (!total) continue;
-    sized.push(toHit(hit.entry, hit.path, total));
+    sized.push(toHit(hit.entry, hit.path, total, projectFor(hit)));
   }
   return sized;
 }
 
-function toHit(entry, full, total) {
+/**
+ * A per-project hit's project as the client sees it: where it is and when
+ * it was last worked on. Null for a hit with no project root, and for a
+ * cache that is not per-project.
+ */
+function projectOfHit(tree, projects, hit) {
+  if (!hit.entry.perProject) return null;
+  const found = projects.get(hit.record.recordNumber);
+  if (!found) return null;
+  const full = resolvePath(tree.dirs, found.record, tree.drive);
+  return full === null ? null : { path: full, lastTouched: found.lastTouched };
+}
+
+function toHit(entry, full, total, project) {
   return {
     id: entry.id,
     label: entry.label,
@@ -148,6 +163,7 @@ function toHit(entry, full, total) {
     bytes: total.bytes.toString(),
     files: total.files,
     perProject: entry.perProject,
+    project,
     mode: "delete",
   };
 }

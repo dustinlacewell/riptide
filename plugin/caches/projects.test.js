@@ -8,7 +8,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { childIndex } from "../mft/tree.js";
+import { markFile } from "../mft/filenames.js";
 import { PROJECT_MARKERS, projectOf, projectsOf } from "./projects.js";
+import { projectNeeds } from "./needs.js";
+import { validatePack } from "./pack.js";
+import { resolveEntries } from "./resolve.js";
 
 const dir = (recordNumber, parent, name) => ({ recordNumber, parent, name, isDirectory: true });
 
@@ -104,6 +108,104 @@ test("project: a nested project's files count, its cache hits do not", () => {
 
 test("project: a hit with no project maps to null", () => {
   assert.equal(projectsOf(TREE, OWN, HITS).get(21), null);
+});
+
+// --- through resolveEntries ------------------------------------------------
+
+/**
+ * A readTree stand-in: builds the volume from `layout` (folder -> [file,
+ * mtime] pairs) and marks files with the query the resolver asks for,
+ * exactly as the stream does.
+ */
+function fakeReadTree(layout) {
+  return async (drive, { query }) => {
+    const dirs = new Map([[5, dir(5, 5, ".")]]);
+    const byPath = new Map([["", 5]]);
+    let next = 100;
+    const ensure = (full) => {
+      if (byPath.has(full)) return byPath.get(full);
+      const cut = full.lastIndexOf("\\");
+      const parent = ensure(cut === -1 ? "" : full.slice(0, cut));
+      const number = next++;
+      dirs.set(number, dir(number, parent, full.slice(cut + 1)));
+      byPath.set(full, number);
+      return number;
+    };
+
+    const ownBytes = new Map();
+    const ownFiles = new Map();
+    const ownLatest = new Map();
+    const marks = new Map();
+    for (const [folder, files] of Object.entries(layout)) {
+      const number = ensure(folder);
+      for (const [name, mtime] of files) {
+        ownBytes.set(number, (ownBytes.get(number) ?? 0n) + 10n);
+        ownFiles.set(number, (ownFiles.get(number) ?? 0) + 1);
+        ownLatest.set(number, Math.max(ownLatest.get(number) ?? 0, mtime));
+        if (query) markFile(marks, query, name, number);
+      }
+    }
+    return { dirs, ownBytes, ownFiles, ownLatest, marks, drive, recordsDone: 0 };
+  };
+}
+
+const LAYOUT = {
+  "code\\app": [["package.json", 1_000]],
+  "code\\app\\src": [["main.js", 2_000]],
+  "code\\app\\node_modules": [["huge.js", 9_000]],
+  "code\\repo": [],
+  "code\\repo\\.git": [["index", 9_500]],
+  "code\\repo\\lib\\node_modules": [["x.js", 8_000]],
+  "code\\repo\\lib": [["a.py", 3_000]],
+  "loose\\node_modules": [["y.js", 7_000]],
+  "cache\\pip": [["wheel", 6_000]],
+};
+
+async function resolveLayout() {
+  const { entries } = validatePack({
+    name: "t",
+    entries: [
+      { id: "nm", label: "node_modules", dirNames: ["node_modules"] },
+      { id: "pip", label: "pip", paths: ["C:\\cache\\pip"] },
+    ],
+  });
+  const { found } = await resolveEntries(entries, {
+    drives: ["C:\\"],
+    root: "C:\\",
+    readTree: fakeReadTree(LAYOUT),
+  });
+  return new Map(found.map((h) => [h.path, h.project]));
+}
+
+test("resolve: a per-project hit carries its project and last-touched time", async () => {
+  const byPath = await resolveLayout();
+  // package.json is marked only because per-project entries ask for markers.
+  assert.deepEqual(byPath.get("C:\\code\\app\\node_modules"), {
+    path: "C:\\code\\app",
+    lastTouched: 2_000,
+  });
+  assert.deepEqual(byPath.get("C:\\code\\repo\\lib\\node_modules"), {
+    path: "C:\\code\\repo",
+    lastTouched: 3_000,
+  });
+});
+
+test("resolve: no project root, or a cache that is not per-project, is null", async () => {
+  const byPath = await resolveLayout();
+  assert.equal(byPath.get("C:\\loose\\node_modules"), null);
+  assert.equal(byPath.get("C:\\cache\\pip"), null);
+});
+
+test("needs: project markers are asked for only with a per-project entry", () => {
+  const { entries } = validatePack({
+    name: "t",
+    entries: [
+      { id: "nm", label: "node_modules", dirNames: ["node_modules"] },
+      { id: "pip", label: "pip", paths: ["C:\\cache\\pip"] },
+    ],
+  });
+  assert.deepEqual(projectNeeds(entries), PROJECT_MARKERS);
+  assert.deepEqual(projectNeeds(entries.filter((e) => !e.perProject)), []);
 });
 
 test("project: a project with no dated file has a null time", () => {

@@ -9,6 +9,7 @@
  */
 
 import { matcherFor } from "./matchers/index.js";
+import { PROJECT_MARKERS } from "./projects.js";
 
 /**
  * @param {Array<{match: Array<{key: string, spec: object}>}>} entries enabled
@@ -24,4 +25,17 @@ export function collectNeeds(entries) {
     }
   }
   return [...out];
+}
+
+/**
+ * The project markers, when any enabled entry is per-project: its hits are
+ * dated by their project (projects.js), and a project root is found by the
+ * manifest files the stream marks. Only the cache scan asks; the space map
+ * does not date hits and does not pay for the marks.
+ *
+ * @param {Array<{perProject: boolean}>} entries enabled
+ * @returns {string[]}
+ */
+export function projectNeeds(entries) {
+  return entries.some((e) => e.perProject) ? PROJECT_MARKERS : [];
 }
