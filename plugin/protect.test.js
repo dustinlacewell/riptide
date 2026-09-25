@@ -44,9 +44,82 @@ test("protect: exact-only entries protect only themselves", () => {
   for (const p of [
     "C:\\Users\\dustin\\AppData\\Local\\npm-cache",
     "C:\\ProgramData\\Dbg",
-    "C:\\Users\\Public\\x",
   ]) {
     assert.equal(protectionOf(p), null, p);
+  }
+});
+
+test("protect: more system subtrees, on any drive", () => {
+  for (const p of [
+    "C:\\Recovery",
+    "C:\\Recovery\\WindowsRE",
+    "C:\\$Extend\\x",
+    "C:\\$WinREAgent",
+    "C:\\$SysReset\\Logs",
+    "C:\\$Windows.~BT\\Sources",
+    "D:\\$Windows.~WS",
+    "C:\\Boot\\en-US",
+    "C:\\EFI\\Microsoft",
+    "C:\\ProgramData\\Microsoft",
+    "C:\\ProgramData\\Microsoft\\Windows\\Start Menu",
+    "C:\\ProgramData\\Microsoft\\VisualStudio\\Other",
+    "C:\\Users\\Public",
+    "C:\\Users\\Public\\x",
+    "C:\\Users\\Default\\AppData\\Local\\Temp",
+    "C:\\Users\\Default User\\x",
+    "C:\\Users\\All Users\\x",
+  ]) {
+    assert.equal(protectionOf(p), "inside a protected system folder", p);
+  }
+  for (const p of ["C:\\Recoveryold\\x", "C:\\Users\\Defaults\\x", "C:\\ProgramData\\MicrosoftEdge\\x", "C:\\a\\$tmp"]) {
+    assert.equal(protectionOf(p), null, p);
+  }
+});
+
+test("protect: a carve-out lets one cache through a protected subtree", () => {
+  for (const p of [
+    "C:\\ProgramData\\Microsoft\\VisualStudio\\Packages",
+    "C:\\ProgramData\\Microsoft\\VisualStudio\\Packages\\Microsoft.VisualCpp,version=1",
+  ]) {
+    assert.equal(protectionOf(p), null, p);
+  }
+  for (const p of [
+    "C:\\ProgramData\\Microsoft\\VisualStudio",
+    "C:\\ProgramData\\Microsoft\\VisualStudio\\PackagesOld",
+  ]) {
+    assert.notEqual(protectionOf(p), null, p);
+  }
+});
+
+test("protect: key folders are subtrees", () => {
+  for (const p of ["C:\\Users\\dustin\\.ssh", "C:\\Users\\dustin\\.ssh\\id_ed25519", "C:\\Users\\dustin\\.gnupg\\private-keys-v1.d"]) {
+    assert.equal(protectionOf(p), "inside a folder of keys", p);
+  }
+  assert.equal(protectionOf("C:\\Users\\dustin\\.sshx\\x"), null);
+});
+
+test("protect: AppData and its three roots are exact", () => {
+  for (const p of [
+    "C:\\Users\\dustin\\AppData",
+    "C:\\Users\\dustin\\AppData\\Local",
+    "C:\\Users\\dustin\\AppData\\Roaming",
+    "C:\\Users\\dustin\\AppData\\LocalLow",
+  ]) {
+    assert.equal(protectionOf(p), "protected system path", p);
+  }
+  for (const p of [
+    "C:\\Users\\dustin\\AppData\\Local\\Temp",
+    "C:\\Users\\dustin\\AppData\\Roaming\\npm-cache",
+    "C:\\Users\\dustin\\AppData\\LocalLow\\x",
+  ]) {
+    assert.equal(protectionOf(p), null, p);
+  }
+});
+
+test("protect: a profile's known folders are exact", () => {
+  for (const name of ["Desktop", "Documents", "Downloads", "Pictures", "Music", "Videos", "OneDrive", "OneDrive - Work", "source"]) {
+    assert.equal(protectionOf(`C:\\Users\\dustin\\${name}`), "protected user folder", name);
+    assert.equal(protectionOf(`C:\\Users\\dustin\\${name}\\x\\node_modules`), null, name);
   }
 });
 
