@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
 import { bytes, sumBytes, when } from "./format.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
+import ZapStatus from "./ZapStatus.jsx";
 import RootField from "./RootField.jsx";
+import SortHeader from "./ui/SortHeader.jsx";
 import { COLUMNS, DEFAULT_SORT, nextSort, sortHits } from "./sort.js";
 import { useRowPainter } from "./useRowPainter.js";
+import { useZapFlow } from "./useZapFlow.js";
 
 /**
  * The Zap tab: find build junk under a root, pick what to keep, delete
@@ -24,14 +27,20 @@ export default function ZapPanel({
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
 
   const [spared, setSpared] = useState(() => new Set());
-  const [pending, setPending] = useState(null);
-  const [outcome, setOutcome] = useState(null);
   const [sort, setSort] = useState(prefs.sort ?? DEFAULT_SORT);
-  const [zapping, setZapping] = useState(null);
-  const [planning, setPlanning] = useState(false);
+
+  // Drop only what actually went. A failed path stays on the list so it can
+  // be retried or investigated.
+  const onDeleted = useCallback((deleted) => {
+    const gone = new Set(deleted);
+    setResult((prev) =>
+      prev ? { ...prev, hits: prev.hits.filter((h) => !gone.has(h.path)) } : prev,
+    );
+  }, []);
+
+  const flow = useZapFlow(onDeleted);
 
   useEffect(() => {
     onPrefsChange({ patterns, sort });
@@ -52,9 +61,9 @@ export default function ZapPanel({
 
   async function runScan() {
     setScanning(true);
-    setError(null);
+    flow.setError(null);
     setResult(null);
-    setOutcome(null);
+    flow.setOutcome(null);
     setSpared(new Set());
     setProgress({ stage: "starting" });
 
@@ -63,51 +72,10 @@ export default function ZapPanel({
         await api.scan({ root, patterns, onProgress: (n) => setProgress(n) }),
       );
     } catch (e) {
-      setError(e.message);
+      flow.setError(e.message);
     } finally {
       setScanning(false);
       setProgress(null);
-    }
-  }
-
-  async function preparePlan() {
-    setError(null);
-    setPlanning(true);
-    try {
-      setPending(await api.plan(selected.map((h) => h.path), selectedBytes));
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setPlanning(false);
-    }
-  }
-
-  async function confirmZap(permanent) {
-    const plan = pending;
-    setPending(null);
-    setError(null);
-    setZapping({ done: 0, total: plan.count, path: "" });
-
-    try {
-      const res = await api.zap({
-        token: plan.token,
-        permanent,
-        confirmCount: plan.count,
-        onProgress: (n) => setZapping({ done: n.done, total: n.total, path: n.path }),
-      });
-
-      setOutcome(res);
-
-      // Drop only what actually went. A failed path stays on the list so it
-      // can be retried or investigated.
-      const gone = new Set(res.deleted);
-      setResult((prev) =>
-        prev ? { ...prev, hits: prev.hits.filter((h) => !gone.has(h.path)) } : prev,
-      );
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setZapping(null);
     }
   }
 
@@ -165,42 +133,9 @@ export default function ZapPanel({
         </p>
       )}
 
-      {error && <p className="error">{error}</p>}
+      {flow.error && <p className="error">{flow.error}</p>}
 
-      {zapping && (
-        <div className="zapping">
-          <div className="bar">
-            <div
-              className="fill"
-              style={{ width: `${(zapping.done / zapping.total) * 100}%` }}
-            />
-          </div>
-          <p className="status">
-            Deleting {zapping.done} of {zapping.total}
-            {zapping.path && <span className="current"> — {zapping.path}</span>}
-          </p>
-        </div>
-      )}
-
-      {outcome && (
-        <div className="outcome">
-          <p>
-            Zapped {outcome.deleted.length}{" "}
-            {outcome.deleted.length === 1 ? "folder" : "folders"}
-            {outcome.permanent ? " permanently" : " to the Recycle Bin"} in{" "}
-            {(outcome.elapsedMs / 1000).toFixed(1)}s.
-          </p>
-          {outcome.failed.length > 0 && (
-            <ul className="failures">
-              {outcome.failed.map((f) => (
-                <li key={f.path}>
-                  {f.path} — <em>{f.error}</em>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
 
       {result && (
         <>
@@ -243,33 +178,11 @@ export default function ZapPanel({
                 <thead>
                   <tr>
                     <th />
-                    {Object.entries(COLUMNS).map(([key, col]) => (
-                      <th
-                        key={key}
-                        className={col.align === "right" ? "num" : undefined}
-                        aria-sort={
-                          sort.key === key
-                            ? sort.direction === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none"
-                        }
-                      >
-                        <button
-                          className={`sort${sort.key === key ? " active" : ""}`}
-                          onClick={() => setSort((s) => nextSort(s, key))}
-                        >
-                          {col.label}
-                          <span className="arrow">
-                            {sort.key === key
-                              ? sort.direction === "asc"
-                                ? "▲"
-                                : "▼"
-                              : ""}
-                          </span>
-                        </button>
-                      </th>
-                    ))}
+                    <SortHeader
+                      columns={COLUMNS}
+                      sort={sort}
+                      onSort={(key) => setSort((s) => nextSort(s, key))}
+                    />
                   </tr>
                 </thead>
                 <tbody>
@@ -300,10 +213,14 @@ export default function ZapPanel({
 
               <button
                 className="danger"
-                onClick={preparePlan}
-                disabled={selected.length === 0 || zapping !== null || planning}
+                onClick={() =>
+                  flow.preparePlan(selected.map((h) => h.path), selectedBytes)
+                }
+                disabled={
+                  selected.length === 0 || flow.zapping !== null || flow.planning
+                }
               >
-                {planning ? (
+                {flow.planning ? (
                   "Checking…"
                 ) : (
                   <>
@@ -321,11 +238,11 @@ export default function ZapPanel({
         </>
       )}
 
-      {pending && (
+      {flow.pending && (
         <ConfirmDialog
-          plan={pending}
-          onCancel={() => setPending(null)}
-          onConfirm={confirmZap}
+          plan={flow.pending}
+          onCancel={flow.cancelPlan}
+          onConfirm={flow.confirmZap}
         />
       )}
     </>

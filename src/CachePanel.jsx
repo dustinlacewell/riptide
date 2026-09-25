@@ -5,6 +5,7 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import CacheSettings from "./CacheSettings.jsx";
 import RootField from "./RootField.jsx";
+import SortHeader from "./ui/SortHeader.jsx";
 import { useZapFlow } from "./useZapFlow.js";
 import { useRowPainter } from "./useRowPainter.js";
 import { CACHE_GROUP_COLUMNS, DEFAULT_SORT, nextSort } from "./sort.js";
@@ -274,33 +275,11 @@ export default function CachePanel({
               <tr>
                 <th />
                 <th />
-                {Object.entries(CACHE_GROUP_COLUMNS).map(([key, col]) => (
-                  <th
-                    key={key}
-                    className={col.align === "right" ? "num" : undefined}
-                    aria-sort={
-                      sort.key === key
-                        ? sort.direction === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                  >
-                    <button
-                      className={`sort${sort.key === key ? " active" : ""}`}
-                      onClick={() => setSort((s) => nextSort(s, key))}
-                    >
-                      {col.label}
-                      <span className="arrow">
-                        {sort.key === key
-                          ? sort.direction === "asc"
-                            ? "▲"
-                            : "▼"
-                          : ""}
-                      </span>
-                    </button>
-                  </th>
-                ))}
+                <SortHeader
+                  columns={CACHE_GROUP_COLUMNS}
+                  sort={sort}
+                  onSort={(key) => setSort((s) => nextSort(s, key))}
+                />
               </tr>
             </thead>
             <tbody>
