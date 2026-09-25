@@ -200,7 +200,7 @@ const TWO_POW_32 = 4294967296;
  *
  * @returns {number|null} Unix milliseconds
  */
-function filetimeToMs(high, low) {
+export function filetimeToMs(high, low) {
   if (high === 0 && low === 0) return null;
   return Math.floor((high * TWO_POW_32 + low) / TICKS_PER_MS) - EPOCH_DIFF_MS;
 }

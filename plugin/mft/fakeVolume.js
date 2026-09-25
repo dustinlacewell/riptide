@@ -60,9 +60,10 @@ export const BLANK = Buffer.alloc(RECORD);
 /**
  * @param {{name?: string, parent?: number, isDirectory?: boolean, size?: number,
  *          mtime?: number|null, seq?: number, inUse?: boolean,
- *          attrs?: Buffer[], base?: number}} spec
+ *          attrs?: Buffer[], base?: number, noData?: boolean}} spec
  *   attrs are extra attributes placed after the name and data; base makes
- *   this an extension record of that base record
+ *   this an extension record of that base record; noData leaves out the
+ *   unnamed $DATA a file otherwise gets
  */
 export function buildRecord({
   name = null,
@@ -74,6 +75,7 @@ export function buildRecord({
   inUse = true,
   attrs = [],
   base = 0,
+  noData = false,
 }) {
   const rec = Buffer.alloc(RECORD);
   rec.write("FILE", 0, "latin1");
@@ -87,7 +89,7 @@ export function buildRecord({
   const parts = [];
   if (mtime !== null) parts.push(standardInformation(mtime));
   if (name !== null) parts.push(fileName(name, parent));
-  if (name !== null && !isDirectory) parts.push(resident(ATTR_DATA, sizedContent(size)));
+  if (name !== null && !isDirectory && !noData) parts.push(resident(ATTR_DATA, sizedContent(size)));
   parts.push(...attrs);
 
   let pos = FIRST_ATTR;
@@ -177,6 +179,176 @@ export function encodeRuns(runs) {
 }
 
 export const align8 = (n) => (n + 7) & ~7;
+
+// ---------------------------------------------------------------------------
+// The change journal
+
+export const JOURNAL_PAGE = 4096;
+
+/**
+ * One USN record.
+ *
+ * @param {{version?: 2|3, frn: number, seq?: number, parentFrn?: number,
+ *          parentSeq?: number, usn: number, time?: number, reason?: number,
+ *          name?: string}} spec
+ */
+export function usnRecord({
+  version = 2,
+  frn,
+  seq = 1,
+  parentFrn = 5,
+  parentSeq = 5,
+  usn,
+  time = 1_700_000_000_000,
+  reason = 0x80000000,
+  name = "f",
+}) {
+  const refWidth = version === 2 ? 8 : 16;
+  const at = 8 + refWidth * 2;
+  const nameBytes = Buffer.from(name, "utf16le");
+  const nameOffset = at + 36;
+  const length = align8(nameOffset + nameBytes.length);
+  const rec = Buffer.alloc(length);
+  rec.writeUInt32LE(length, 0);
+  rec.writeUInt16LE(version, 4);
+  rec.writeBigUInt64LE(reference(frn, seq), 8);
+  rec.writeBigUInt64LE(reference(parentFrn, parentSeq), 8 + refWidth);
+  rec.writeBigInt64LE(BigInt(usn), at);
+  rec.writeBigUInt64LE(filetime(time), at + 8);
+  rec.writeUInt32LE(reason, at + 16);
+  rec.writeUInt16LE(nameBytes.length, at + 32);
+  rec.writeUInt16LE(nameOffset, at + 34);
+  nameBytes.copy(rec, nameOffset);
+  return rec;
+}
+
+/**
+ * Lay records out as $J does: from firstUsn on, never across a page, the
+ * rest of a page left zero.
+ *
+ * @param {object[]} specs usnRecord specs without usn
+ * @param {number} firstUsn
+ * @returns {{bytes: Buffer, start: number, end: number, usns: number[]}}
+ *   bytes covers [start, end); start is firstUsn's page
+ */
+export function layOutJournal(specs, firstUsn) {
+  const start = firstUsn - (firstUsn % JOURNAL_PAGE);
+  const parts = [];
+  const usns = [];
+  let pos = firstUsn;
+  for (const spec of specs) {
+    let rec = usnRecord({ ...spec, usn: pos });
+    const left = JOURNAL_PAGE - (pos % JOURNAL_PAGE);
+    if (rec.length > left) {
+      pos += left;
+      rec = usnRecord({ ...spec, usn: pos });
+    }
+    parts.push({ at: pos - start, rec });
+    usns.push(pos);
+    pos += rec.length;
+  }
+  const bytes = Buffer.alloc(pos - start);
+  for (const { at, rec } of parts) rec.copy(bytes, at);
+  return { bytes, start, end: pos, usns };
+}
+
+/**
+ * Give a volume a change journal: $UsnJrnl in record `record` under
+ * $Extend, its $ATTRIBUTE_LIST sending $J to two extension records (so the
+ * stream's runs must be stitched), $J sparse below its first page.
+ *
+ * Call again with a longer list to append: USNs of the earlier records do
+ * not move.
+ *
+ * @param {ReturnType<typeof buildVolume>} volume
+ * @param {{changes: object[], record?: number, extensions?: [number, number],
+ *          firstUsn?: number, id?: bigint, lowestValidUsn?: number,
+ *          lcn?: number, clusters?: number, version?: 2|3}} spec
+ *   the journal's data sits at clusters [lcn, lcn + clusters), split in two
+ *   halves that are not adjacent on the volume
+ * @returns {{nextUsn: number, usns: number[]}}
+ */
+export function installJournal(
+  volume,
+  {
+    changes,
+    record = 40,
+    extensions = [41, 42],
+    firstUsn = 2 * JOURNAL_PAGE,
+    id = 77n,
+    lowestValidUsn = firstUsn,
+    lcn = 100,
+    clusters = 16,
+  },
+) {
+  const laid = layOutJournal(changes, firstUsn);
+  const sparse = laid.start / CLUSTER;
+  const half = clusters / 2;
+  const secondLcn = lcn + half + 4; // a gap: the halves are not adjacent
+  const capacity = clusters * CLUSTER;
+  if (laid.bytes.length > capacity) throw new Error("fake journal too small for its records");
+
+  // Stream bytes [start, start + half) at lcn; the rest at secondLcn.
+  const firstHalf = laid.bytes.subarray(0, half * CLUSTER);
+  const secondHalf = laid.bytes.subarray(half * CLUSTER);
+  volume.buf.fill(0, lcn * CLUSTER, (lcn + half) * CLUSTER);
+  volume.buf.fill(0, secondLcn * CLUSTER, (secondLcn + half) * CLUSTER);
+  firstHalf.copy(volume.buf, lcn * CLUSTER);
+  secondHalf.copy(volume.buf, secondLcn * CLUSTER);
+
+  const max = Buffer.alloc(32);
+  max.writeBigUInt64LE(32n * 1024n * 1024n, 0);
+  max.writeBigUInt64LE(8n * 1024n * 1024n, 8);
+  max.writeBigUInt64LE(id, 16);
+  max.writeBigInt64LE(BigInt(lowestValidUsn), 24);
+
+  const list = Buffer.concat([
+    listEntry({ type: 0x30, record }),
+    listEntry({ type: ATTR_DATA, name: "$Max", record }),
+    listEntry({ type: ATTR_DATA, name: "$J", record: extensions[0], lowestVcn: 0 }),
+    listEntry({ type: ATTR_DATA, name: "$J", record: extensions[1], lowestVcn: sparse + half }),
+  ]);
+
+  volume.write(record, {
+    name: "$UsnJrnl",
+    parent: 11,
+    attrs: [resident(0x20, list), resident(ATTR_DATA, max, "$Max")],
+    noData: true,
+  });
+  volume.write(extensions[0], {
+    base: record,
+    attrs: [
+      nonResident(ATTR_DATA, {
+        name: "$J",
+        runs: [{ lcn: null, length: sparse }, { lcn, length: half }].filter((r) => r.length > 0),
+        dataSize: laid.end,
+      }),
+    ],
+  });
+  volume.write(extensions[1], {
+    base: record,
+    attrs: [nonResident(ATTR_DATA, { name: "$J", lowestVcn: sparse + half, runs: [{ lcn: secondLcn, length: half }] })],
+  });
+  return { nextUsn: laid.end, usns: laid.usns };
+}
+
+function listEntry({ type, name = "", record, lowestVcn = 0, seq = 1 }) {
+  const nameBytes = Buffer.from(name, "utf16le");
+  const length = align8(0x1a + nameBytes.length);
+  const entry = Buffer.alloc(length);
+  entry.writeUInt32LE(type, 0);
+  entry.writeUInt16LE(length, 4);
+  entry.writeUInt8(name.length, 6);
+  entry.writeUInt8(0x1a, 7);
+  entry.writeBigUInt64LE(BigInt(lowestVcn), 8);
+  entry.writeBigUInt64LE(reference(record, seq), 0x10);
+  nameBytes.copy(entry, 0x1a);
+  return entry;
+}
+
+function reference(n, seq) {
+  return (BigInt(seq) << 48n) | BigInt(n);
+}
 
 /** Unix ms as a FILETIME. */
 export function filetime(ms) {
