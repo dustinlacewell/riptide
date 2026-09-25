@@ -3,8 +3,10 @@
  *
  * A tree is a pure function of the records it was given: directories by
  * record number, and each folder's own tallies of the files directly in
- * it. addRecord folds one record in. The stream calls it for every record
- * of a full read.
+ * it. addRecord folds one record in; the stream calls it for every record
+ * of a full read. removeRecord takes a record's contribution back out,
+ * from what the tree stored, so a change is: remove, then add the record
+ * as it is now. Both are safe to repeat.
  *
  *   dirs       Map  record -> directory record
  *   ownBytes   Map  folder -> bytes of the files directly in it (bigint)
@@ -19,7 +21,7 @@
  */
 
 import { createMarks, markFile, queryIds } from "./filenames.js";
-import { createFileTable, putFile, toSeconds } from "./files.js";
+import { NO_PARENT, createFileTable, dropFile, fileAt, putFile, toSeconds } from "./files.js";
 
 // $Extend is always record 11; the change journal is the file in it named
 // $UsnJrnl. Spotting it as it streams past saves reading $Extend's index.
@@ -80,6 +82,69 @@ export function addRecord(tree, n, entry) {
     seq: entry.seq ?? 0,
     mask: maskOf(tree.marks.ids, ids),
   });
+}
+
+/**
+ * Take a record's contribution back out: a folder leaves dirs; a file
+ * leaves its parent's tallies and marks. A record that added nothing is
+ * left alone.
+ *
+ * A folder whose newest file time may have left with the file is put in
+ * `stale`; refreshLatest settles those once a batch is done.
+ *
+ * @param {ReturnType<typeof createTree>} tree
+ * @param {number} n
+ * @param {Set<number>} stale folders whose ownLatest must be recomputed
+ * @returns {number|null} the folder whose tallies changed, or the folder
+ *   removed; null when the record added nothing
+ */
+export function removeRecord(tree, n, stale) {
+  if (tree.dirs.delete(n)) return n;
+  const file = fileAt(tree.files, n);
+  if (!file) return null;
+
+  const { parent, size, mtime, mask } = file;
+  const files = (tree.ownFiles.get(parent) ?? 1) - 1;
+  if (files <= 0) {
+    tree.ownFiles.delete(parent);
+    tree.ownBytes.delete(parent);
+    tree.ownLatest.delete(parent);
+  } else {
+    tree.ownFiles.set(parent, files);
+    tree.ownBytes.set(parent, (tree.ownBytes.get(parent) ?? 0n) - BigInt(size));
+    if (mtime > 0 && mtime * 1000 >= (tree.ownLatest.get(parent) ?? 0)) stale.add(parent);
+  }
+  for (const id of idsOfMask(tree.marks.ids, mask)) tree.marks.unset(parent, id);
+  dropFile(tree.files, n);
+  return parent;
+}
+
+/**
+ * Recompute ownLatest for folders that lost their newest file. One pass
+ * over the file table, and only when there is something to settle.
+ *
+ * @param {ReturnType<typeof createTree>} tree
+ * @param {Set<number>} stale
+ */
+export function refreshLatest(tree, stale) {
+  if (stale.size === 0) return;
+  let top = 0;
+  for (const dir of stale) if (dir > top) top = dir;
+  const wanted = new Uint8Array(top + 1);
+  for (const dir of stale) wanted[dir] = 1;
+
+  const newest = new Map();
+  const { parent, mtime } = tree.files;
+  for (let n = 0; n < parent.length; n++) {
+    const p = parent[n];
+    if (p === NO_PARENT || p >= wanted.length || wanted[p] === 0 || mtime[n] === 0) continue;
+    const ms = mtime[n] * 1000;
+    if (!(newest.get(p) >= ms)) newest.set(p, ms);
+  }
+  for (const dir of stale) {
+    if (newest.has(dir)) tree.ownLatest.set(dir, newest.get(dir));
+    else tree.ownLatest.delete(dir);
+  }
 }
 
 /**
