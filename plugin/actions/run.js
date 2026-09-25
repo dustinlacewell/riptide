@@ -11,6 +11,7 @@
  *   critical     once started, the step runs to the end: no abort and no
  *                timeout kills it. Killing DISM or diskpart midway can
  *                leave the system or a disk in a bad state.
+ *   keepGoing    a failure does not stop the steps after it (see runAction)
  *   cleanup      a step run after this one fails for any reason: error,
  *                kill, timeout. It runs even after an abort. Its outcome
  *                does not change the failure reported.
@@ -23,7 +24,15 @@
 import path from "node:path";
 
 /**
- * @param {{id: string, steps: (ctx: object) => Promise<object[]>}} action
+ * Run an action's steps in order.
+ *
+ * `preflight`, when the action has one, is asked just before the first
+ * step; a reason it returns refuses the run. A failed step ends the run,
+ * unless it is marked `keepGoing`: then its result is reported as a line
+ * and the next step runs, and the action fails at the end if any did.
+ *
+ * @param {{id: string, steps: (ctx: object) => Promise<object[]>,
+ *          preflight?: (ctx: object) => Promise<string|null>}} action
  * @param {{spawn: Function}} ctx
  * @param {{onLine?: (note: {id: string, line: string}) => void,
  *          onStep?: (note: {id: string, label: string, critical: boolean}) => void,
@@ -32,25 +41,32 @@ import path from "node:path";
  * @returns {Promise<{id: string, ok: boolean, error?: string}>}
  */
 export async function runAction(action, ctx, { onLine = () => {}, onStep = () => {}, signal } = {}) {
+  const fail = (error) => ({ id: action.id, ok: false, error });
   let steps;
   try {
     steps = await action.steps(ctx);
+    const refused = action.preflight ? await action.preflight(ctx) : null;
+    if (refused) return fail(refused);
   } catch (err) {
-    return { id: action.id, ok: false, error: err.message };
+    return fail(err.message);
   }
 
+  const line = (text) => onLine({ id: action.id, line: text });
+  const independent = steps.filter((s) => s.keepGoing).length;
+  let failed = 0;
+
   for (const step of steps) {
-    if (!signal?.aborted) {
-      onStep({ id: action.id, label: commandText(step), critical: step.critical === true });
+    const label = commandText(step);
+    if (!signal?.aborted) onStep({ id: action.id, label, critical: step.critical === true });
+    const result = await runStep(step, { spawn: ctx.spawn, onLine: line, signal });
+    if (!step.keepGoing) {
+      if (!result.ok) return fail(result.error);
+      continue;
     }
-    const result = await runStep(step, {
-      spawn: ctx.spawn,
-      onLine: (line) => onLine({ id: action.id, line }),
-      signal,
-    });
-    if (!result.ok) return { id: action.id, ok: false, error: result.error };
+    line(result.ok ? `${label}: ok` : `${label}: failed — ${result.error}`);
+    if (!result.ok) failed += 1;
   }
-  return { id: action.id, ok: true };
+  return failed > 0 ? fail(`${failed} of ${independent} failed`) : { id: action.id, ok: true };
 }
 
 /**

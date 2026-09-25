@@ -19,10 +19,11 @@ import wslCompact, {
   compactScript,
   detachScript,
   diskPathProblem,
+  dockerDesktopRunning,
   findDisks,
   isSafeDiskPath,
 } from "./wsl-compact.js";
-import { runStep } from "./run.js";
+import { runAction, runStep } from "./run.js";
 import windowsComponentCleanup from "./windows-component-cleanup.js";
 import { parseDockerSize } from "./docker.js";
 
@@ -247,6 +248,64 @@ test("wsl: a failed, killed or timed-out compact is followed by a detach", async
   const fine = createFakeSpawn();
   assert.equal((await runStep(compact, { spawn: fine.spawn })).ok, true);
   assert.equal(fine.calls.length, 1);
+});
+
+const DESKTOP_ROW = '"Docker Desktop.exe","14812","Console","1","182,344 K"\r\n';
+const NO_TASKS = "INFO: No tasks are running which match the specified criteria.\r\n";
+
+test("wsl: unavailable while Docker Desktop runs; asked through System32 tasklist", async (t) => {
+  const { env, sys } = await wslMachine(t);
+  const fake = createFakeSpawn(() => ({ stdout: [DESKTOP_ROW] }));
+  assert.deepEqual(await wslCompact.detect({ env, spawn: fake.spawn }), {
+    available: false,
+    reason: "Quit Docker Desktop first.",
+    bytes: null,
+  });
+  assert.deepEqual(fake.calls.map((c) => [c.exe, ...c.args]), [
+    [path.join(sys, "System32", "tasklist.exe"), "/FI", "IMAGENAME eq Docker Desktop.exe", "/FO", "CSV", "/NH"],
+  ]);
+
+  const failing = createFakeSpawn(() => ({ code: 1 }));
+  const unsure = await wslCompact.detect({ env, spawn: failing.spawn });
+  assert.equal(unsure.reason, "could not check for Docker Desktop");
+
+  assert.equal(dockerDesktopRunning([NO_TASKS]), false);
+  assert.equal(dockerDesktopRunning(['"Docker Desktop Helper.exe","1"']), false);
+});
+
+test("wsl: Docker Desktop started after the scan refuses the run before any step", async (t) => {
+  const { env, sys } = await wslMachine(t);
+  const tasklist = path.join(sys, "System32", "tasklist.exe");
+  const fake = createFakeSpawn((exe) => (exe === tasklist ? { stdout: [DESKTOP_ROW] } : { code: 0 }));
+  const result = await runAction(wslCompact, { env, spawn: fake.spawn });
+  assert.deepEqual(result, { id: "wsl-compact", ok: false, error: "Quit Docker Desktop first." });
+  assert.deepEqual(fake.calls.map((c) => c.exe), [tasklist], "no shutdown, no diskpart");
+});
+
+test("wsl: one disk failing does not skip the others; each reports a line", async (t) => {
+  const { env, sys } = await wslMachine(t);
+  const diskpart = path.join(sys, "System32", "diskpart.exe");
+  let compacts = 0;
+  const fake = createFakeSpawn((exe, args) => {
+    if (exe.endsWith("tasklist.exe")) return { stdout: [NO_TASKS] };
+    if (exe === diskpart && args.length === 0) {
+      // The first compact fails; its detach cleanup and the second compact follow.
+      return compacts++ === 0 ? { stdout: ["DiskPart has encountered an error: in use\r\n"] } : { code: 0 };
+    }
+    return { code: 0 };
+  });
+  const lines = [];
+  const result = await runAction(wslCompact, { env, spawn: fake.spawn }, { onLine: (n) => lines.push(n.line) });
+
+  assert.deepEqual(result, { id: "wsl-compact", ok: false, error: "1 of 2 failed" });
+  const diskpartRuns = fake.calls.filter((c) => c.exe === diskpart);
+  assert.equal(diskpartRuns.length, 3, "compact, its detach, then the second compact");
+  assert.match(diskpartRuns[1].stdin, /detach vdisk noerr/);
+  assert.match(diskpartRuns[2].stdin, /compact vdisk/);
+  const verdicts = lines.filter((l) => /^diskpart: compact .*: (ok|failed)/.test(l));
+  assert.equal(verdicts.length, 2);
+  assert.match(verdicts[0], /: failed — DiskPart has encountered an error: in use$/);
+  assert.match(verdicts[1], /: ok$/);
 });
 
 test("wsl: the stdin script is exactly the diskpart commands", () => {

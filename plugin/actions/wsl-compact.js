@@ -22,11 +22,13 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
 
+import { capture } from "./run.js";
 import { fileExists, system32 } from "./spawn.js";
 
 const SHUTDOWN_TIMEOUT_MS = 2 * 60 * 1000;
 const COMPACT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const DETACH_TIMEOUT_MS = 5 * 60 * 1000;
+const PROBE_TIMEOUT_MS = 20 * 1000;
 const DOCKER_DEPTH = 4;
 const DISKPART_ERROR = /DiskPart has encountered an error|Virtual Disk Service error|DiskPart failed/i;
 
@@ -45,9 +47,15 @@ export default {
     if ((await findDisks(ctx.env)).length === 0) {
       return { available: false, reason: "no WSL disks found", bytes: null };
     }
+    const desktop = await dockerDesktopProblem(ctx);
+    if (desktop) return { available: false, reason: desktop, bytes: null };
     // What compacting frees depends on the free space inside each disk.
     return { available: true, bytes: null };
   },
+
+  // Docker Desktop restarts WSL as soon as it goes down, and then holds its
+  // disk. Asked again at run time: it may have started since the scan.
+  preflight: dockerDesktopProblem,
 
   async steps(ctx) {
     const { wsl, diskpart } = tools(ctx.env);
@@ -64,6 +72,8 @@ export default {
         failPattern: DISKPART_ERROR,
         // Killing a compact midway can damage the disk.
         critical: true,
+        // Each disk stands alone: one failing does not skip the rest.
+        keepGoing: true,
         // diskpart on stdin runs past an error, but a kill or a timeout
         // stops it with the disk still attached.
         cleanup: {
@@ -95,6 +105,33 @@ export function compactScript(disk) {
     "exit",
     "",
   ].join("\r\n");
+}
+
+/**
+ * Why Docker Desktop stops a compact, or null when it does not: it is
+ * running, or whether it runs could not be told.
+ *
+ * @returns {Promise<string|null>}
+ */
+export async function dockerDesktopProblem(ctx) {
+  const probe = await capture(ctx.spawn, {
+    exe: path.win32.join(system32(ctx.env), "tasklist.exe"),
+    args: ["/FI", "IMAGENAME eq Docker Desktop.exe", "/FO", "CSV", "/NH"],
+    timeoutMs: PROBE_TIMEOUT_MS,
+  });
+  if (!probe.ok) return "could not check for Docker Desktop";
+  return dockerDesktopRunning(probe.stdout) ? "Quit Docker Desktop first." : null;
+}
+
+/**
+ * Whether tasklist's CSV output lists Docker Desktop. With no match,
+ * tasklist prints an "INFO:" line instead of a row.
+ *
+ * @param {string[]} lines
+ * @returns {boolean}
+ */
+export function dockerDesktopRunning(lines) {
+  return lines.some((line) => /^"docker desktop\.exe",/i.test(line.trim()));
 }
 
 /**
