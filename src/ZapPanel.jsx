@@ -3,6 +3,7 @@ import * as api from "./api.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
 import DeleteRun from "./DeleteRun.jsx";
+import FullRescan from "./FullRescan.jsx";
 import ReclaimPanel from "./ReclaimPanel.jsx";
 import { fateOf } from "./deleteTally.js";
 import { pathKey } from "./pathKey.js";
@@ -75,7 +76,7 @@ export default function ZapPanel({
   const busy = scanning || flow.planning || flow.deleting;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
-  async function runScan() {
+  async function runScan({ full = false } = {}) {
     const signal = run.begin();
     setScanning(true);
     flow.setError(null);
@@ -85,7 +86,7 @@ export default function ZapPanel({
     telemetry.start();
 
     try {
-      const found = await api.scan({ root, patterns, signal, onProgress: telemetry.note });
+      const found = await api.scan({ root, patterns, full, signal, onProgress: telemetry.note });
       telemetry.finish({
         strategy: found.strategy,
         stats: found.stats,
@@ -141,9 +142,10 @@ export default function ZapPanel({
           />
         </label>
 
-        <button className="primary" onClick={runScan} disabled={scanning || !root}>
+        <button className="primary" onClick={() => runScan()} disabled={scanning || !root}>
           {scanning ? "Scanning…" : "Scan"}
         </button>
+        <FullRescan onClick={() => runScan({ full: true })} disabled={scanning || !root} />
         {scanning && <button onClick={run.stop}>Stop</button>}
       </section>
 

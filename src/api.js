@@ -16,10 +16,11 @@ export async function getDirs(path, { signal } = {}) {
 /**
  * Stream a scan. Calls onProgress for each progress line and resolves with
  * the final result. Aborting the signal drops the connection, which stops
- * the server's work too.
+ * the server's work too. full reads the whole MFT instead of updating the
+ * drive's kept tree from the change journal.
  */
-export function scan({ root, patterns, onProgress, signal }) {
-  return streamNdjson("/scan", { root, patterns }, onProgress, signal);
+export function scan({ root, patterns, full = false, onProgress, signal }) {
+  return streamNdjson("/scan", { root, patterns, full }, onProgress, signal);
 }
 
 /** True for the rejection an aborted request produces. */
@@ -97,9 +98,12 @@ export function grep(options, onFile, signal) {
   );
 }
 
-/** Enumerate caches from the loaded packs, skipping any disabled ids. */
-export function caches({ disabled, root }, onProgress, signal) {
-  return streamNdjson("/caches", { disabled, root }, onProgress, signal);
+/**
+ * Enumerate caches from the loaded packs, skipping any disabled ids.
+ * full reads each drive's whole MFT instead of updating a kept tree.
+ */
+export function caches({ disabled, root, full = false }, onProgress, signal) {
+  return streamNdjson("/caches", { disabled, root, full }, onProgress, signal);
 }
 
 /** Every known cache config, enabled or not, for the settings modal. */
@@ -114,8 +118,8 @@ export async function cacheConfigs() {
  * and Caches tabs' settings, which decide what the map marks as junk.
  * Resolves with the snapshot's name.
  */
-export function mapRead({ root, patterns, disabled }, onProgress, signal) {
-  return streamNdjson("/map/read", { root, patterns, disabled }, onProgress, signal);
+export function mapRead({ root, patterns, disabled, full = false }, onProgress, signal) {
+  return streamNdjson("/map/read", { root, patterns, disabled, full }, onProgress, signal);
 }
 
 /**

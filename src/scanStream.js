@@ -9,6 +9,9 @@
  *   strategy  mft | walk | null (not yet known)
  *   rate      records (or folders, on a walk) per second over the last
  *             second or so
+ *   fullReads drives whose whole MFT was read this run
+ *   deltas    drives brought up to date from the change journal instead
+ *   changes   records those updates read again
  */
 
 import { compactCount } from "./format.js";
@@ -25,6 +28,9 @@ export const IDLE = Object.freeze({
   recordsDone: 0,
   recordsTotal: null,
   recordsRead: 0,
+  fullReads: 0,
+  deltas: 0,
+  changes: 0,
   rate: 0,
   samples: [],
   matches: null,
@@ -76,11 +82,15 @@ export function stepsOf(state) {
   return { steps, current: steps.indexOf(state.phase) };
 }
 
-/** "4.87M records · 26.1 s · MFT" */
-export function receiptLine({ records, ms, strategy }) {
-  const walk = strategy === "walk";
-  const unit = walk ? "folders" : "records";
-  return `${compactCount(records)} ${unit} · ${(ms / 1000).toFixed(1)} s · ${walk ? "walk" : "MFT"}`;
+/**
+ * "full read 4.87M records · 26.1 s", "updated 3,120 changes · 0.4 s",
+ * or "812 folders · 42.0 s · walk".
+ */
+export function receiptLine({ records, ms, strategy, how = "full", changes = 0 }) {
+  const seconds = `${(ms / 1000).toFixed(1)} s`;
+  if (strategy === "walk") return `${compactCount(records)} folders · ${seconds} · walk`;
+  if (how === "delta") return `updated ${changes.toLocaleString("en-US")} changes · ${seconds}`;
+  return `full read ${compactCount(records)} records · ${seconds}`;
 }
 
 /** What to tell the user when the scan fell back to a walk. */
@@ -104,7 +114,11 @@ const STAGES = {
   "mft-done": (s, n, t) => ({
     ...withRecords(s, n.recordsDone, t),
     recordsRead: s.recordsRead + n.recordsDone,
+    fullReads: s.fullReads + 1,
   }),
+  // A kept tree brought up to date from the change journal.
+  journal: (s) => ({ ...s, strategy: "mft", phase: "read" }),
+  "mft-delta": (s, n) => ({ ...s, deltas: s.deltas + 1, changes: s.changes + (n.changes ?? 0) }),
   index: (s) => ({ ...s, phase: "index" }),
   size: (s) => ({ ...s, phase: "size" }),
   // The map read's steps after the MFT: marking junk is its index step,
@@ -166,15 +180,21 @@ function withRecords(state, count, t) {
   return { ...state, recordsDone: count, samples, rate };
 }
 
+/**
+ * A run is an update only when every drive in it was; one full read makes
+ * the receipt a full read.
+ */
 function finish(state, { t, stats, elapsedMs, strategy }) {
-  const how = strategy ?? state.strategy ?? "mft";
+  const used = strategy ?? state.strategy ?? "mft";
   const records = stats?.records ?? (state.recordsRead || state.recordsDone);
   const ms = elapsedMs ?? t - (state.startedAt ?? t);
+  const how = stats?.how ?? (state.deltas > 0 && state.fullReads === 0 ? "delta" : "full");
+  const changes = stats?.changes ?? state.changes;
   return {
     ...state,
     phase: "done",
-    strategy: how,
+    strategy: used,
     finishedAt: t,
-    receipt: { records, ms, strategy: how },
+    receipt: { records, ms, strategy: used, how, changes },
   };
 }

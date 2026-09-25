@@ -113,8 +113,45 @@ test("finish writes the receipt from server stats when given", () => {
     elapsedMs: 26_100,
   });
   assert.equal(state.phase, "done");
-  assert.deepEqual(state.receipt, { records: 4_870_112, ms: 26_100, strategy: "mft" });
-  assert.equal(receiptLine(state.receipt), "4.87M records · 26.1 s · MFT");
+  assert.deepEqual(state.receipt, { records: 4_870_112, ms: 26_100, strategy: "mft", how: "full", changes: 0 });
+  assert.equal(receiptLine(state.receipt), "full read 4.87M records · 26.1 s");
+});
+
+test("a run of journal updates gets an update receipt", () => {
+  const state = scanReducer(
+    run(
+      [0, { stage: "reading-mft", drive: "C:", driveIndex: 1, driveCount: 2 }],
+      [5, { stage: "journal", drive: "C:" }],
+      [10, { stage: "mft-delta", drive: "C:", changes: 3_000, ms: 300 }],
+      [20, { stage: "reading-mft", drive: "D:", driveIndex: 2, driveCount: 2 }],
+      [30, { stage: "mft-delta", drive: "D:", changes: 120, ms: 100 }],
+    ),
+    { type: "finish", t: 400 },
+  );
+  assert.equal(state.receipt.how, "delta");
+  assert.equal(receiptLine(state.receipt), "updated 3,120 changes · 0.4 s");
+});
+
+test("one full read among updates makes the receipt a full read", () => {
+  const state = scanReducer(
+    run(
+      [10, { stage: "mft-delta", changes: 5 }],
+      [20, { stage: "mft-done", recordsDone: 900, recordsTotal: 900 }],
+    ),
+    { type: "finish", t: 400 },
+  );
+  assert.equal(state.receipt.how, "full");
+});
+
+test("server stats say how the Zap scan read", () => {
+  const state = scanReducer(run(), {
+    type: "finish",
+    t: 500,
+    strategy: "mft",
+    stats: { records: 10, how: "delta", changes: 42 },
+    elapsedMs: 500,
+  });
+  assert.equal(receiptLine(state.receipt), "updated 42 changes · 0.5 s");
 });
 
 test("finish without stats sums the drives read and times from start", () => {
@@ -127,7 +164,7 @@ test("finish without stats sums the drives read and times from start", () => {
     ),
     { type: "finish", t: 4000 },
   );
-  assert.deepEqual(state.receipt, { records: 2000, ms: 4000, strategy: "mft" });
+  assert.deepEqual(state.receipt, { records: 2000, ms: 4000, strategy: "mft", how: "full", changes: 0 });
 });
 
 test("a walk receipt counts folders", () => {

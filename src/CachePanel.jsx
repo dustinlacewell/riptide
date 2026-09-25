@@ -8,6 +8,7 @@ import CacheRuleRows from "./CacheRuleRows.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import DeleteRun from "./DeleteRun.jsx";
 import CacheSettings from "./CacheSettings.jsx";
+import FullRescan from "./FullRescan.jsx";
 import { fateOf } from "./deleteTally.js";
 import { pathKey } from "./pathKey.js";
 import ReclaimPanel from "./ReclaimPanel.jsx";
@@ -97,7 +98,7 @@ export default function CachePanel({
   const busy = loading || flow.planning || flow.deleting;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
-  const scan = useCallback(async () => {
+  const scan = useCallback(async ({ full = false } = {}) => {
     const signal = run.begin();
     setLoading(true);
     flow.setError(null);
@@ -112,7 +113,7 @@ export default function CachePanel({
     setScannedAt(Date.now());
 
     try {
-      const done = await api.caches({ disabled, root }, (note) => {
+      const done = await api.caches({ disabled, root, full }, (note) => {
         if (note.type === "actions") {
           setPacks(note.packs ?? []);
           setActions(note.actions);
@@ -264,9 +265,10 @@ export default function CachePanel({
           <Glyph name="cog" size={20} />
         </button>
 
-        <button className="primary" onClick={scan} disabled={loading}>
+        <button className="primary" onClick={() => scan()} disabled={loading}>
           {loading ? "Looking…" : summary ? "Rescan" : "Find caches"}
         </button>
+        <FullRescan onClick={() => scan({ full: true })} disabled={loading} />
         {loading && <button onClick={run.stop}>Stop</button>}
       </section>
 

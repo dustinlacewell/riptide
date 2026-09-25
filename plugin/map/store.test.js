@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 import { createKeep } from "../keep.js";
 import { createMapStore } from "./store.js";
-import { readMap } from "./read.js";
+import { readMap, rebuildMap } from "./read.js";
 import { buildSnapshot } from "./compact.js";
 import { fakeTree } from "./fakeTree.js";
 
@@ -158,6 +158,31 @@ test("read: a newer read of the same drive stops the older one", async () => {
   await assert.rejects(older, isAbort);
   assert.equal(store.get("C:").gen, done.gen);
   assert.equal(store.get("C:").snap.bytes[0], 7);
+});
+
+test("rebuild: a tree the journal moved on rebuilds its snapshot, junk and all", async () => {
+  const store = createMapStore();
+  const made = tree(40);
+  const volume = { ...made.tree, version: 0, how: "delta", changes: 3 };
+  const first = await readMap({
+    drive: "C:",
+    store,
+    patterns: ["node_modules"],
+    readTree: async () => ({ ...volume, recordsDone: 1, readMs: 1 }),
+    usedSpace: noSpace,
+  });
+  assert.equal(first.stats.how, "delta");
+  assert.equal(first.stats.changes, 3);
+
+  assert.equal(rebuildMap({ drive: "C:", tree: volume, store }), null, "same version: nothing to do");
+
+  volume.ownBytes.set(made.byPath.get("Users\\dustin\\code\\node_modules"), 100n);
+  volume.version = 1;
+  const slot = rebuildMap({ drive: "C:", tree: volume, store });
+  assert.ok(slot.read > first.read, "new ids, so a new read");
+  assert.equal(slot.snap.bytes[0], 105);
+  assert.equal(slot.snap.junkBytes[0], 100, "junk marks come from the first read's settings");
+  assert.equal(rebuildMap({ drive: "D:", tree: volume, store }), null, "no snapshot held");
 });
 
 test("read: a fired signal reads nothing", async () => {

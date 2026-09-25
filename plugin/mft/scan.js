@@ -54,7 +54,8 @@ const now = () => performance.now();
  *                                 mtime: number|null}>,
  *   mtime is the folder's own modified time, Unix ms.
  *                    stats: {records: number, readMs: number,
- *                            indexMs: number, sizeMs: number}}>}
+ *                            indexMs: number, sizeMs: number,
+ *                            how?: "full"|"delta", changes?: number}}>}
  */
 export async function scanVolume({
   root,
@@ -109,6 +110,9 @@ async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal
       readMs: tree.readMs,
       indexMs: sizeStart - indexStart,
       sizeMs: clock() - sizeStart,
+      // Through the tree cache: "delta" when the journal updated a kept tree.
+      how: tree.how ?? "full",
+      changes: tree.changes ?? 0,
     },
   };
 }

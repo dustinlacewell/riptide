@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import DeleteRun from "./DeleteRun.jsx";
+import FullRescan from "./FullRescan.jsx";
 import { bytes } from "./format.js";
 import { dropPick, dropRecords, reclaimItems, togglePick } from "./mapPicks.js";
 import { drillable } from "./mapView.js";
@@ -94,12 +95,12 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
   const busy = space.reading || flow.planning || flow.deleting;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
-  const read = () => {
+  const read = ({ full = false } = {}) => {
     setPicks(new Map());
     setOfferRefused([]);
     flow.setError(null);
     flow.clearRun();
-    space.read(root, { patterns: prefs.patterns, disabled: prefs.disabledCaches });
+    space.read(root, { patterns: prefs.patterns, disabled: prefs.disabledCaches, full });
   };
 
   const zap = async () => {
@@ -126,9 +127,10 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
           recent={recentRoots}
           placeholder="C:\"
         />
-        <button className="primary" onClick={read} disabled={space.reading || !root}>
+        <button className="primary" onClick={() => read()} disabled={space.reading || !root}>
           {space.reading ? "Reading…" : "Read drive"}
         </button>
+        <FullRescan onClick={() => read({ full: true })} disabled={space.reading || !root} />
         {space.reading && <button onClick={space.stop}>Stop</button>}
       </section>
 

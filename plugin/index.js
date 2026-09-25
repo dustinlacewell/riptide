@@ -26,7 +26,7 @@ import { createKeep, KEEP_CHOICES } from "./keep.js";
 import { createTreeCache, readerOf } from "./mft/treeCache.js";
 import { buildNameQuery } from "./mft/filenames.js";
 import { standingNeeds } from "./caches/needs.js";
-import { readMap } from "./map/read.js";
+import { readMap, rebuildMap } from "./map/read.js";
 import { childrenPage } from "./map/page.js";
 import { identifyFolder } from "./map/identify.js";
 import { offerPicks } from "./map/offer.js";
@@ -64,6 +64,12 @@ const trees = createTreeCache({ keep });
 
 /** Space-map snapshots, one per drive, held between requests. */
 const maps = createMapStore({ keep });
+
+// A tree the journal moved on makes its drive's snapshot stale. Rebuilt
+// after the current request's own work, not inside it.
+trees.onChanged((drive) => {
+  setImmediate(() => rebuildMap({ drive, tree: trees.peek(drive), store: maps }));
+});
 
 /**
  * A readTree that goes through the tree cache. Every read asks for the
@@ -202,7 +208,7 @@ async function cachesRoute(req, res) {
   // packs load must still cancel the run.
   const signal = abortOnDisconnect(res);
 
-  const { disabled, root } = await body(req);
+  const { disabled, root, full } = await body(req);
   if (signal.aborted) return;
   const { entries: all, packs, errors } = await loadPacks();
   if (signal.aborted) return;
@@ -247,7 +253,7 @@ async function cachesRoute(req, res) {
       signal,
       // With a root, only its drive is read and only hits under it are kept.
       root: typeof root === "string" && root.trim() ? root : null,
-      readTree: treeReader(all),
+      readTree: treeReader(all, { full: full === true }),
       onProgress: (note) =>
         res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
       // One message per drive, carrying sized results. Nothing is reported
@@ -290,7 +296,7 @@ async function cachesRoute(req, res) {
 async function scanRoute(req, res) {
   const signal = abortOnDisconnect(res);
 
-  const { root, patterns } = await body(req);
+  const { root, patterns, full } = await body(req);
   if (signal.aborted) return;
 
   if (!root || typeof root !== "string") {
@@ -326,7 +332,7 @@ async function scanRoute(req, res) {
   try {
     result = await scanVolume({
       root,
-      readTree: treeReader(packEntries),
+      readTree: treeReader(packEntries, { full: full === true }),
       matches,
       // The same test, counted live while the MFT streams.
       countMatch: matches,
@@ -522,6 +528,10 @@ async function zapRoute(req, res) {
   });
 
   // Before the done line: a map that reloads on it must see the change.
+  // Kept trees are left alone: the journal reports these deletes on the
+  // next update, which re-reads each record rather than subtracting, so
+  // nothing is taken away twice. A snapshot patched here is rebuilt from
+  // the tree once that update lands.
   maps.removePaths(deleted);
 
   write({
@@ -542,7 +552,7 @@ async function zapRoute(req, res) {
 async function mapReadRoute(req, res) {
   const signal = abortOnDisconnect(res);
 
-  const { root, patterns, disabled } = await body(req);
+  const { root, patterns, disabled, full } = await body(req);
   if (signal.aborted) return;
 
   const drive = typeof root === "string" ? driveOf(root.trim()) : null;
@@ -568,7 +578,7 @@ async function mapReadRoute(req, res) {
       drive,
       root: root.trim(),
       store: maps,
-      readTree: treeReader(all),
+      readTree: treeReader(all, { full: full === true }),
       entries,
       patterns: normalizePatterns(patterns),
       drives,

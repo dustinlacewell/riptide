@@ -46,13 +46,30 @@ export function createMapStore({ keep = createKeep(), now = Date.now } = {}) {
     return { signal, end };
   }
 
-  /** Hold a completed snapshot. Returns its slot. */
-  function publish(drive, snap, { recordsTotal = 0 } = {}) {
+  /**
+   * Hold a completed snapshot. Returns its slot.
+   *
+   * @param {string} drive
+   * @param {object} snap
+   * @param {{recordsTotal?: number, version?: number|null, context?: object|null}} [opts]
+   *   version is the tree version it was built from; context what built
+   *   its junk marks, so it can be built again when the tree moves on
+   */
+  function publish(drive, snap, { recordsTotal = 0, version = null, context = null } = {}) {
     const key = keyOf(drive);
     snap.gen = ++counter;
     // `read` names the snapshot; `gen` also moves when a delete changes it.
     // Ids stay valid while `read` is the same.
-    const slot = { drive: key, snap, gen: snap.gen, read: snap.gen, readAt: now(), recordsTotal };
+    const slot = {
+      drive: key,
+      snap,
+      gen: snap.gen,
+      read: snap.gen,
+      readAt: now(),
+      recordsTotal,
+      version,
+      context,
+    };
     slots.set(key, slot);
     keep.touch(key);
     return slot;
@@ -99,5 +116,5 @@ export function createMapStore({ keep = createKeep(), now = Date.now } = {}) {
     }
   }
 
-  return { begin, publish, get, at, removePaths };
+  return { begin, publish, get, at, removePaths, peek: (drive) => slots.get(keyOf(drive)) ?? null };
 }

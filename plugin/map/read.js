@@ -67,7 +67,35 @@ export async function volumeUsed(drive) {
   }
 }
 
+/**
+ * Build a held snapshot again from its drive's tree after the tree moved
+ * on (the change journal updated it). Patching the snapshot in place
+ * would mean inserting and moving rows in its breadth-first layout; a
+ * rebuild is one junk pass and one compact, a few hundred ms for a large
+ * drive. The rebuild takes new ids, so a client viewing it is told the map
+ * changed and starts again at the drive root.
+ *
+ * @param {{drive: string, tree: object|null, store: object}} opts
+ * @returns {object|null} the new slot; null when there was nothing to do
+ */
+export function rebuildMap({ drive, tree, store }) {
+  const slot = store.peek(drive);
+  if (!slot || !tree || slot.version === null || slot.version === tree.version) return null;
+  const junk = junkMarks(tree, slot.context ?? {});
+  const snap = buildSnapshot(tree, { junk });
+  return store.publish(drive, snap, {
+    recordsTotal: tree.recordsTotal,
+    version: tree.version,
+    context: slot.context,
+  });
+}
+
 // ---------------------------------------------------------------------------
+
+/** What junkMarks needs, kept with the snapshot for a rebuild. */
+function junkContext({ entries, patterns, drives, env }) {
+  return { entries, patterns, drives, env };
+}
 
 async function readAndPublish(opts, signal) {
   const { drive, root, store, readTree, usedSpace, onProgress, clock } = opts;
@@ -93,7 +121,11 @@ async function readAndPublish(opts, signal) {
   const used = await usedSpace(drive);
   signal.throwIfAborted();
 
-  const slot = store.publish(drive, snap, { recordsTotal: volume.recordsTotal });
+  const slot = store.publish(drive, snap, {
+    recordsTotal: volume.recordsTotal,
+    version: volume.version ?? null,
+    context: junkContext(opts),
+  });
   const rootId = root ? Math.max(0, idOfPath(snap, root)) : 0;
 
   return {
@@ -105,6 +137,8 @@ async function readAndPublish(opts, signal) {
     stats: {
       records: volume.recordsDone,
       readMs: volume.readMs,
+      how: volume.how ?? "full",
+      changes: volume.changes ?? 0,
       junkMs,
       compactMs,
       junkBytes: snap.junkBytes[0],
