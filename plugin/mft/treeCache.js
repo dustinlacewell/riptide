@@ -31,7 +31,7 @@ import { createKeep, keyOf } from "../keep.js";
 import { parseBootSector } from "./boot.js";
 import { queryIds } from "./filenames.js";
 import { driveBytes } from "./footprint.js";
-import { MAX_CHANGES, applyChanges, changedRecords, staleReason } from "./apply.js";
+import { MAX_CHANGES, applyChanges, changedRecords, staleReason, unflushedRecords } from "./apply.js";
 import { findUsnAt, readChanges, readJournalInfo } from "./journal.js";
 import { readEntries } from "./reread.js";
 import { readMftRuns, readTreeFrom } from "./scan.js";
@@ -166,8 +166,10 @@ export function createTreeCache({
 
     const { entries, torn } = await readEntries({ read, boot, mftRuns, numbers, signal });
     const { recordsTotal } = recordsIn(runsToByteRanges(mftRuns, boot.bytesPerCluster), boot.bytesPerFileRecord);
-    // A torn record is read again next time rather than guessed at now.
-    return { reason: null, info, end, mftRuns, numbers, entries, recent: [...recent, ...torn], recordsTotal };
+    // A torn record, or one older on disk than its journal entry, is read
+    // again next time rather than trusted now.
+    const again = new Set([...recent, ...torn, ...unflushedRecords(changes, entries)]);
+    return { reason: null, info, end, mftRuns, numbers, entries, recent: [...again], recordsTotal };
   }
 
   async function readFull(key, { query = null, signal, onProgress, countMatch } = {}) {

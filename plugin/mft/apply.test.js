@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { parseFileRecord } from "./record.js";
 import { buildNameQuery } from "./filenames.js";
 import { addRecord, createTree } from "./fold.js";
-import { LAG_MS, applyChanges, changedRecords, staleReason } from "./apply.js";
+import { LAG_MS, applyChanges, changedRecords, staleReason, unflushedRecords } from "./apply.js";
 import { buildRecord } from "./fakeVolume.js";
 import { dumpTree } from "./treeDump.js";
 import { createWorld } from "./world.js";
@@ -91,6 +91,28 @@ test("apply: parents are read again, and recent changes are carried", () => {
   const { numbers, recent } = changedRecords(changes, { recent: [7], now: 20_000 });
   assert.deepEqual([...numbers].sort((a, b) => a - b), [7, 20, 21, 60, 61]);
   assert.deepEqual(recent.sort((a, b) => a - b), [21, 61], "only what changed under LAG_MS ago");
+});
+
+test("apply: a record whose own USN trails the journal is unflushed", () => {
+  const changes = [
+    { frn: 50, usn: 100 },
+    { frn: 50, usn: 300 },
+    { frn: 51, usn: 200 },
+    { frn: 52, usn: 250 },
+    { frn: 53, usn: 260 },
+  ];
+  const entries = new Map([
+    [50, { usn: 120 }], // behind its newest record, 300
+    [51, { usn: 200 }],
+    [52, { usn: null }], // no USN to compare: trusted
+    [53, null], // gone: nothing left to be stale
+  ]);
+  assert.deepEqual(unflushedRecords(changes, entries), [50]);
+});
+
+test("record: $STANDARD_INFORMATION's USN is read when present", () => {
+  assert.equal(entryOf({ name: "a", parent: 5, usn: 123456 }, 50).usn, 123456);
+  assert.equal(entryOf({ name: "a", parent: 5, mtime: 5_000 }, 50).usn, null);
 });
 
 test("apply: a torn record keeps what the tree had", () => {

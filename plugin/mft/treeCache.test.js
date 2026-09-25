@@ -213,6 +213,31 @@ test("cache: when only a full read will do, it does one and says why", async () 
   assert.deepEqual(dumpTree(wrapped.tree, SPAN), await freshDump(run.volume));
 });
 
+test("cache: a record older on disk than its journal entry is read again, however late", async () => {
+  const volume = buildVolume({
+    records: {
+      5: { name: ".", parent: 5, isDirectory: true },
+      11: { name: "$Extend", parent: 5, isDirectory: true },
+      50: { name: "a.txt", parent: 5, size: 10, usn: 0 },
+    },
+  });
+  installJournal(volume, { changes: [] });
+  // Far past LAG_MS: age alone would not keep the record.
+  const cache = cacheOn(volume, { wallClock: () => 9e12 });
+  const others = (await cache.get("C:")).tree.ownBytes.get(5) - 10n; // $MFT sits in the root too
+
+  const { usns } = installJournal(volume, { changes: [{ frn: 50, parentFrn: 5, time: 1_000 }] });
+  const stale = await cache.get("C:"); // record 50 not flushed: still size 10, USN 0
+  assert.equal(stale.how, "delta");
+  assert.equal(stale.tree.ownBytes.get(5), others + 10n);
+  assert.deepEqual(stale.tree.recent, [50]);
+
+  volume.write(50, { name: "a.txt", parent: 5, size: 99, usn: usns[0] }); // the flush lands
+  const fixed = await cache.get("C:");
+  assert.equal(fixed.tree.ownBytes.get(5), others + 99n);
+  assert.deepEqual(fixed.tree.recent, []);
+});
+
 test("cache: a journal that fails to read falls back to a full read", async () => {
   const run = journaled(8);
   let breakNext = false;

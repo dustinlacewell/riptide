@@ -53,6 +53,31 @@ export function changedRecords(changes, { recent = [], now }) {
 }
 
 /**
+ * Records read back older than the journal says they are.
+ *
+ * $STANDARD_INFORMATION carries the USN of the file's last journal record.
+ * A record whose USN is below the newest journal USN for it has not been
+ * flushed to disk yet, however long ago the change was. It is read again
+ * next time; LAG_MS alone would give up on it after ten seconds.
+ *
+ * @param {import("./usn.js").Change[]} changes
+ * @param {Map<number, {usn: number|null, seq: number}|null>} entries as re-read
+ * @returns {number[]}
+ */
+export function unflushedRecords(changes, entries) {
+  const newest = new Map();
+  for (const c of changes) {
+    if (!(newest.get(c.frn) >= c.usn)) newest.set(c.frn, c.usn);
+  }
+  const out = [];
+  for (const [frn, usn] of newest) {
+    const entry = entries.get(frn);
+    if (entry && entry.usn !== null && entry.usn !== undefined && entry.usn < usn) out.push(frn);
+  }
+  return out;
+}
+
+/**
  * @param {object} tree from fold.js, updated in place
  * @param {Iterable<number>} numbers records to re-apply
  * @param {Map<number, object|null>} entries each record as it is now, from

@@ -60,7 +60,9 @@ export const BLANK = Buffer.alloc(RECORD);
 /**
  * @param {{name?: string, parent?: number, isDirectory?: boolean, size?: number,
  *          mtime?: number|null, seq?: number, inUse?: boolean,
- *          attrs?: Buffer[], base?: number, noData?: boolean}} spec
+ *          attrs?: Buffer[], base?: number, noData?: boolean,
+ *          usn?: number|null}} spec
+ *   usn gives $STANDARD_INFORMATION its 3.x form carrying that USN;
  *   attrs are extra attributes placed after the name and data; base makes
  *   this an extension record of that base record; noData leaves out the
  *   unnamed $DATA a file otherwise gets
@@ -76,6 +78,7 @@ export function buildRecord({
   attrs = [],
   base = 0,
   noData = false,
+  usn = null,
 }) {
   const rec = Buffer.alloc(RECORD);
   rec.write("FILE", 0, "latin1");
@@ -87,7 +90,7 @@ export function buildRecord({
   rec.writeBigUInt64LE(BigInt(base), 0x20);
 
   const parts = [];
-  if (mtime !== null) parts.push(standardInformation(mtime));
+  if (mtime !== null || usn !== null) parts.push(standardInformation(mtime, usn));
   if (name !== null) parts.push(fileName(name, parent));
   if (name !== null && !isDirectory && !noData) parts.push(resident(ATTR_DATA, sizedContent(size)));
   parts.push(...attrs);
@@ -368,9 +371,11 @@ function bootSector(serial) {
   return buf;
 }
 
-function standardInformation(mtime) {
-  const content = Buffer.alloc(0x30);
-  content.writeBigUInt64LE(filetime(mtime), 8);
+// The short (NTFS 1.2) form without a USN, or the 3.x form with one.
+function standardInformation(mtime, usn) {
+  const content = Buffer.alloc(usn === null ? 0x30 : 0x48);
+  if (mtime !== null) content.writeBigUInt64LE(filetime(mtime), 8);
+  if (usn !== null) content.writeBigUInt64LE(BigInt(usn), 0x40);
   return resident(ATTR_SI, content);
 }
 

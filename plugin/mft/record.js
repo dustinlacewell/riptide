@@ -74,6 +74,8 @@ export function applyFixup(rec, bytesPerSector) {
  *          mtime is the $STANDARD_INFORMATION modified time, Unix ms.
  *          seq is the header's sequence number: it moves each time the
  *          record is reused, so (recordNumber, seq) names one file.
+ *          usn is the USN of the file's last journal record, from
+ *          $STANDARD_INFORMATION; null on a record too old to carry it.
  *          null when the record is unused or not a real entry
  */
 export function parseFileRecord(rec, recordNumber) {
@@ -90,6 +92,7 @@ export function parseFileRecord(rec, recordNumber) {
   let parent = null;
   let size = 0n;
   let mtime = null;
+  let usn = null;
 
   let pos = rec.readUInt16LE(0x14);
 
@@ -108,6 +111,8 @@ export function parseFileRecord(rec, recordNumber) {
       if (content && content.length >= 24) {
         mtime = filetimeToMs(content.readUInt32LE(12), content.readUInt32LE(8));
       }
+      // NTFS 3.x adds the file's last journal USN at 0x40.
+      if (content && content.length >= 0x48) usn = Number(content.readBigUInt64LE(0x40));
     } else if (type === ATTR_FILE_NAME && !nonResident) {
       const content = residentContent(rec, pos);
       if (content && content.length >= 0x42) {
@@ -144,7 +149,7 @@ export function parseFileRecord(rec, recordNumber) {
 
   if (name === null || parent === null) return null;
 
-  return { recordNumber, isDirectory, name, parent, size, mtime, seq: rec.readUInt16LE(0x10) };
+  return { recordNumber, isDirectory, name, parent, size, mtime, seq: rec.readUInt16LE(0x10), usn };
 }
 
 /**
