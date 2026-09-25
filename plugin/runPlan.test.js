@@ -9,13 +9,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { runPlan } from "./runPlan.js";
+import { bindActions } from "./actions/bind.js";
 import { listActions } from "./actions/list.js";
 import { runAction } from "./actions/run.js";
 import { createFakeSpawn } from "./actions/fakeSpawn.js";
 
 function fakeAction(id, steps, detect = async () => ({ available: true, bytes: null })) {
-  return { id, label: id, tool: "t", risk: "safe", cost: "", detect, steps: async () => steps };
+  return { id, label: id, tool: "t", risk: "safe", cost: "", detect, steps: async () => steps, planned: steps };
 }
+
+/** A plan's action item, its steps bound as /plan binds them. */
+const bound = (registry, id) => ({ kind: "action", id, steps: registry[id]?.planned ?? [] });
 
 function stubZap(calls) {
   return async (paths, { permanent, onProgress }) => {
@@ -39,9 +43,9 @@ test("runPlan: paths first, then actions in order, with their output", async () 
 
   const result = await runPlan(
     [
-      { kind: "action", id: "b" },
+      bound(registry, "b"),
       { kind: "path", path: "C:\\x\\good" },
-      { kind: "action", id: "a" },
+      bound(registry, "a"),
       { kind: "path", path: "C:\\x\\bad" },
     ],
     {
@@ -86,7 +90,7 @@ test("runPlan: a failed action does not stop the next; an unknown id fails", asy
   };
   const zapCalls = [];
   const result = await runPlan(
-    [{ kind: "action", id: "a" }, { kind: "action", id: "gone" }, { kind: "action", id: "b" }],
+    [bound(registry, "a"), bound(registry, "gone"), bound(registry, "b")],
     {
       permanent: false,
       write: () => {},
@@ -112,7 +116,7 @@ test("runPlan: a disconnect kills the running action and starts no more", async 
   };
   const controller = new AbortController();
   const pending = runPlan(
-    [{ kind: "action", id: "a" }, { kind: "action", id: "b" }],
+    [bound(registry, "a"), bound(registry, "b")],
     {
       permanent: false,
       signal: controller.signal,
@@ -127,6 +131,54 @@ test("runPlan: a disconnect kills the running action and starts no more", async 
   const result = await pending;
   assert.deepEqual(fake.calls.map((c) => [c.exe, c.killed]), [["C:\\a.exe", true]]);
   assert.deepEqual(result.actions.map((a) => a.error), ["stopped", "stopped"]);
+});
+
+test("plan binds steps: steps() changing after the plan has no effect on the run", async () => {
+  let disks = ["C:\\one.vhdx"];
+  const action = {
+    id: "shifty",
+    label: "Shifty",
+    risk: "safe",
+    steps: async () => disks.map((d) => ({ exe: "C:\\tool.exe", args: [d], timeoutMs: 1000 })),
+  };
+  const actionFor = (id) => (id === "shifty" ? action : null);
+
+  const { bound: planned, refused } = await bindActions(["shifty"], { actionFor, ctx: {} });
+  assert.deepEqual(refused, []);
+  assert.deepEqual(planned[0].commands, ["tool C:\\one.vhdx"], "the dialog shows the bound steps");
+
+  // Between /plan and /zap, the machine changes.
+  disks = ["C:\\one.vhdx", "C:\\surprise.vhdx"];
+  action.steps = async () => [{ exe: "C:\\other.exe", args: [], timeoutMs: 1000 }];
+
+  const fake = createFakeSpawn();
+  const result = await runPlan([{ kind: "action", id: "shifty", steps: planned[0].steps }], {
+    permanent: false,
+    write: () => {},
+    zapPaths: stubZap([]),
+    runAction,
+    actionFor,
+    ctx: { spawn: fake.spawn },
+  });
+  assert.deepEqual(result.actions, [{ id: "shifty", ok: true }]);
+  assert.deepEqual(fake.calls.map((c) => [c.exe, ...c.args]), [["C:\\tool.exe", "C:\\one.vhdx"]]);
+});
+
+test("bindActions: an action whose steps() throws or is empty is refused", async () => {
+  const registry = {
+    boom: { id: "boom", label: "B", risk: "safe", steps: async () => { throw new Error("gone"); } },
+    none: { id: "none", label: "N", risk: "safe", steps: async () => [] },
+  };
+  const { bound: planned, refused } = await bindActions(["boom", "none", "ghost"], {
+    actionFor: (id) => registry[id] ?? null,
+    ctx: {},
+  });
+  assert.deepEqual(planned, []);
+  assert.deepEqual(refused, [
+    { id: "boom", reason: "could not prepare: gone" },
+    { id: "none", reason: "nothing to run" },
+    { id: "ghost", reason: "unknown action" },
+  ]);
 });
 
 // --- listing ---------------------------------------------------------------

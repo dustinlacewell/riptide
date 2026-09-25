@@ -28,6 +28,7 @@ import { identifyFolder } from "./map/identify.js";
 import { offerPicks } from "./map/offer.js";
 import { actionFor } from "./actions/index.js";
 import { commandsOf, listActions } from "./actions/list.js";
+import { bindActions } from "./actions/bind.js";
 import { runAction } from "./actions/run.js";
 import { createSpawner } from "./actions/spawn.js";
 import { runPlan } from "./runPlan.js";
@@ -415,18 +416,13 @@ async function planRoute(req, res) {
     }),
   );
 
-  // What the confirmation shows for each action: the commands it will run.
-  const ctx = await actionContext();
-  const planActions = await Promise.all(
-    actionIds.map(async (id) => {
-      const action = actionFor(id);
-      return { id, label: action.label, risk: action.risk, commands: await commandsOf(action, ctx) };
-    }),
-  );
+  // Each action's steps are fixed here. The dialog shows them and /zap runs
+  // exactly them; nothing is resolved again in between.
+  const bound = await bindActions(actionIds, { actionFor, ctx: await actionContext() });
 
   const planItems = [
     ...present.map((path) => ({ kind: "path", path })),
-    ...actionIds.map((id) => ({ kind: "action", id })),
+    ...bound.bound.map(({ id, steps }) => ({ kind: "action", id, steps })),
   ];
   const token = randomUUID();
   plans.set(token, { items: planItems, expires: Date.now() + PLAN_TTL_MS });
@@ -438,9 +434,9 @@ async function planRoute(req, res) {
     count: planItems.length,
     bytes: typeof bytes === "string" ? bytes : "0",
     paths: present,
-    actions: planActions,
+    actions: bound.bound.map(({ id, label, risk, commands }) => ({ id, label, risk, commands })),
     refused,
-    refusedActions,
+    refusedActions: [...refusedActions, ...bound.refused],
     missing,
   });
 }

@@ -17,7 +17,12 @@
  * The I/O is injected, so this is testable without deleting or running
  * anything.
  *
- * @param {Array<{kind: "path", path: string}|{kind: "action", id: string}>} items
+ * An action item carries the steps bound when the plan was made (see
+ * actions/bind.js). Those run, exactly; the action's own steps() is never
+ * asked again. Only its preflight check comes from the registry.
+ *
+ * @param {Array<{kind: "path", path: string}|
+ *               {kind: "action", id: string, steps: object[]}>} items
  * @param {{permanent: boolean, signal?: AbortSignal, write: (note: object) => void,
  *          zapPaths: Function, runAction: Function,
  *          actionFor: (id: string) => object|null, ctx: object}} deps
@@ -26,11 +31,11 @@
  */
 export async function runPlan(items, deps) {
   const paths = items.filter((i) => i.kind === "path").map((i) => i.path);
-  const ids = items.filter((i) => i.kind === "action").map((i) => i.id);
+  const bound = items.filter((i) => i.kind === "action");
 
   const results = paths.length > 0 ? await deletePaths(paths, deps) : [];
   const actions = [];
-  for (const id of ids) actions.push(await runOne(id, deps));
+  for (const item of bound) actions.push(await runOne(item, deps));
 
   return {
     deleted: results.filter((r) => r.ok).map((r) => r.path),
@@ -46,16 +51,17 @@ function deletePaths(paths, { permanent, write, zapPaths }) {
   });
 }
 
-async function runOne(id, { signal, write, runAction, actionFor, ctx }) {
+async function runOne({ id, steps }, { signal, write, runAction, actionFor, ctx }) {
   const action = actionFor(id);
-  if (!action) {
-    const result = { id, ok: false, error: "unknown action" };
-    write({ type: "action", id, status: "failed", error: result.error });
-    return result;
+  const problem = !action ? "unknown action" : !Array.isArray(steps) ? "no steps bound" : null;
+  if (problem) {
+    write({ type: "action", id, status: "failed", error: problem });
+    return { id, ok: false, error: problem };
   }
 
   write({ type: "action", id, status: "running" });
-  const result = await runAction(action, ctx, {
+  const planned = { id, steps: async () => steps, preflight: action.preflight };
+  const result = await runAction(planned, ctx, {
     signal,
     onLine: ({ line }) => write({ type: "action", id, line }),
     onStep: ({ label, critical }) => write({ type: "action", id, step: label, critical }),
