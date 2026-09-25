@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api.js";
+import Dialog from "./ui/Dialog.jsx";
 
 /**
  * Which cache configs are active.
@@ -24,12 +25,6 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
   useEffect(() => {
     searchRef.current?.focus();
   }, [configs]);
-
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const matches = useMemo(() => {
     if (!configs) return [];
@@ -79,76 +74,71 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
     : 0;
 
   return (
-    <div className="backdrop" onClick={onClose}>
-      <div className="dialog settings" onClick={(e) => e.stopPropagation()}>
-        <h2>Cache configs</h2>
-        <p className="reclaim">
-          {configs
-            ? `${enabledCount} of ${configs.length} enabled`
-            : "Loading…"}
-        </p>
+    <Dialog title="Cache configs" onClose={onClose} className="settings">
+      <p className="reclaim">
+        {configs ? `${enabledCount} of ${configs.length} enabled` : "Loading…"}
+      </p>
 
-        {error && <p className="error">{error}</p>}
+      {error && <p className="error">{error}</p>}
 
-        <input
-          ref={searchRef}
-          className="settings-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name, tool, or path"
-          spellCheck={false}
-        />
+      <input
+        ref={searchRef}
+        className="settings-search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search by name, tool, or path"
+        spellCheck={false}
+      />
 
-        <div className="bulk">
-          <button onClick={() => setMany(shownIds, true)}>
-            Enable {query ? "shown" : "all"}
-          </button>
-          <button onClick={() => setMany(shownIds, false)}>
-            Disable {query ? "shown" : "all"}
-          </button>
-        </div>
-
-        <div className="config-list">
-          {byPack.map(([pack, items]) => (
-            <div key={pack} className="config-group">
-              <div className="config-group-head">{pack}</div>
-              {items.map((config) => (
-                <label key={config.id} className="config-row">
-                  <input
-                    type="checkbox"
-                    checked={!off.has(config.id)}
-                    onChange={() => toggle(config.id)}
-                  />
-                  <span className="config-main">
-                    <span className="config-label">
-                      {config.label}
-                      {config.perProject && (
-                        <span className="config-tag">per project</span>
-                      )}
-                      {config.risk === "caution" && (
-                        <span className="caution-flag" title={config.riskNote}>
-                          caution
-                        </span>
-                      )}
-                    </span>
-                    <span className="config-where">
-                      {config.where.join("  ·  ")}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          ))}
-
-          {configs && matches.length === 0 && (
-            <p className="empty">Nothing matches “{query}”.</p>
-          )}
-        </div>
-
-        <div className="actions">
-          <button onClick={onClose}>Done</button>
-        </div>
+      <div className="bulk">
+        <button onClick={() => setMany(shownIds, true)}>
+          Enable {query ? "shown" : "all"}
+        </button>
+        <button onClick={() => setMany(shownIds, false)}>
+          Disable {query ? "shown" : "all"}
+        </button>
       </div>
-    </div>
+
+      <div className="config-list">
+        {byPack.map(([pack, items]) => (
+          <div key={pack} className="config-group">
+            <div className="config-group-head">{pack}</div>
+            {items.map((config) => (
+              <label key={config.id} className="config-row">
+                <input
+                  type="checkbox"
+                  checked={!off.has(config.id)}
+                  onChange={() => toggle(config.id)}
+                />
+                <span className="config-main">
+                  <span className="config-label">
+                    {config.label}
+                    {config.perProject && (
+                      <span className="config-tag">per project</span>
+                    )}
+                    {config.risk === "caution" && (
+                      <span className="caution-flag" title={config.riskNote}>
+                        caution
+                      </span>
+                    )}
+                  </span>
+                  <span className="config-where">
+                    {config.where.join("  ·  ")}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        ))}
+
+        {configs && matches.length === 0 && (
+          <p className="empty">Nothing matches “{query}”.</p>
+        )}
+      </div>
+
+      <div className="actions">
+        <button onClick={onClose}>Done</button>
+      </div>
+    </Dialog>
   );
 }

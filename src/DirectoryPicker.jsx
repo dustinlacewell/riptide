@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api.js";
 import { crumbs } from "./crumbs.js";
+import Dialog from "./ui/Dialog.jsx";
 
 /**
  * Browse the filesystem for a root directory.
@@ -20,7 +21,6 @@ export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
   const [cursor, setCursor] = useState(0);
 
   const listRef = useRef(null);
-  const dialogRef = useRef(null);
   // Each load gets a number; a slow one that lands after a newer one is
   // dropped, so a cold drive cannot overwrite the folder you moved on to.
   const runId = useRef(0);
@@ -78,9 +78,8 @@ export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
     goTo(trail.length > 1 ? trail[trail.length - 2].path : null);
   }, [goTo, listing, at]);
 
+  // Esc is the Dialog's; the rest of the keyboard is the list's.
   function onKeyDown(e) {
-    if (e.key === "Escape") return onCancel();
-
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const step = e.key === "ArrowDown" ? 1 : -1;
@@ -106,12 +105,6 @@ export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
     }
   }
 
-  // The dialog takes focus once, on open, so the arrow keys land here rather
-  // than on whatever was focused behind the backdrop.
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
-
   // Keep the highlighted row on screen when the arrows walk past the edge.
   useEffect(() => {
     listRef.current
@@ -120,95 +113,90 @@ export default function DirectoryPicker({ roots, recent, onPick, onCancel }) {
   }, [cursor, listing]);
 
   return (
-    <div className="backdrop" onClick={onCancel}>
-      <div
-        className="dialog picker"
-        role="dialog"
-        aria-label="Choose a folder"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={onKeyDown}
-        ref={dialogRef}
-      >
-        <div className="picker-bar">
-          <button className="crumb" onClick={() => goTo(null)} title="Drives">
-            drives
+    <Dialog
+      title="Choose a folder"
+      onClose={onCancel}
+      onKeyDown={onKeyDown}
+      className="picker"
+    >
+      <div className="picker-bar">
+        <button className="crumb" onClick={() => goTo(null)} title="Drives">
+          drives
+        </button>
+        {crumbs(at).map((crumb) => (
+          <button
+            key={crumb.path}
+            className="crumb"
+            onClick={() => goTo(crumb.path)}
+            title={crumb.path}
+          >
+            <span className="sep">\</span>
+            {crumb.label}
           </button>
-          {crumbs(at).map((crumb) => (
-            <button
-              key={crumb.path}
-              className="crumb"
-              onClick={() => goTo(crumb.path)}
-              title={crumb.path}
-            >
-              <span className="sep">\</span>
-              {crumb.label}
+        ))}
+      </div>
+
+      {recent.length > 0 && at === null && (
+        <div className="picker-recent">
+          <span className="label">recent</span>
+          {recent.map((r) => (
+            <button key={r} className="chip" onClick={() => goTo(r)} title={r}>
+              {r}
             </button>
           ))}
         </div>
+      )}
 
-        {recent.length > 0 && at === null && (
-          <div className="picker-recent">
-            <span className="label">recent</span>
-            {recent.map((r) => (
-              <button key={r} className="chip" onClick={() => goTo(r)} title={r}>
-                {r}
-              </button>
-            ))}
-          </div>
+      <div className="picker-list" ref={listRef}>
+        {/* Anywhere but the top has a level above it: a real parent, or
+            the drive list when standing on a drive root. It stays put
+            during a load so the way back does not blink out. */}
+        {at !== null && (
+          <button className="row up" onClick={up}>
+            <span className="caret">▴</span>
+            <span className="row-name">..</span>
+          </button>
         )}
 
-        <div className="picker-list" ref={listRef}>
-          {/* Anywhere but the top has a level above it: a real parent, or
-              the drive list when standing on a drive root. It stays put
-              during a load so the way back does not blink out. */}
-          {at !== null && (
-            <button className="row up" onClick={up}>
-              <span className="caret">▴</span>
-              <span className="row-name">..</span>
-            </button>
-          )}
+        {entries.map((entry, i) => (
+          <button
+            key={entry.path}
+            className={rowClass(entry, i === cursor)}
+            data-cursor={i === cursor}
+            onClick={() => {
+              setCursor(i);
+              enter(entry);
+            }}
+            disabled={!entry.accessible}
+            title={entry.accessible ? entry.path : `${entry.path} — no access`}
+          >
+            <span className="caret">▸</span>
+            <span className="row-name">{entry.name}</span>
+            {!entry.accessible && <span className="row-note">no access</span>}
+          </button>
+        ))}
 
-          {entries.map((entry, i) => (
-            <button
-              key={entry.path}
-              className={rowClass(entry, i === cursor)}
-              data-cursor={i === cursor}
-              onClick={() => {
-                setCursor(i);
-                enter(entry);
-              }}
-              disabled={!entry.accessible}
-              title={entry.accessible ? entry.path : `${entry.path} — no access`}
-            >
-              <span className="caret">▸</span>
-              <span className="row-name">{entry.name}</span>
-              {!entry.accessible && <span className="row-note">no access</span>}
-            </button>
-          ))}
+        {loading && <p className="picker-status">reading…</p>}
 
-          {loading && <p className="picker-status">reading…</p>}
+        {!loading && entries.length === 0 && !error && (
+          <p className="picker-status">no subfolders</p>
+        )}
+      </div>
 
-          {!loading && entries.length === 0 && !error && (
-            <p className="picker-status">no subfolders</p>
-          )}
-        </div>
+      {error && <p className="error picker-error">{error}</p>}
 
-        {error && <p className="error picker-error">{error}</p>}
-
-        <div className="picker-foot">
-          <span className="picker-selected" title={selected}>
-            {selected || "no folder selected"}
-          </span>
-          <div className="actions">
-            <button onClick={onCancel}>Cancel</button>
-            <button className="primary" disabled={!selected} onClick={() => onPick(selected)}>
-              Select
-            </button>
-          </div>
+      <div className="picker-foot">
+        <span className="picker-selected" title={selected}>
+          {selected || "no folder selected"}
+        </span>
+        <div className="actions">
+          <button onClick={onCancel}>Cancel</button>
+          <button className="primary" disabled={!selected} onClick={() => onPick(selected)}>
+            Select
+          </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

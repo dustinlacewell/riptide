@@ -743,31 +743,6 @@ button.twist:hover .caret {
 
 /* --- dialogs ------------------------------------------------------------- */
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--scrim);
-  display: grid;
-  place-items: center;
-  padding: var(--s-5);
-}
-
-.dialog {
-  width: min(560px, 100%);
-  max-height: 85vh;
-  overflow-y: auto;
-  padding: var(--s-5);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
-
-.dialog h2 {
-  margin: 0 0 4px;
-  font-size: var(--fs-title);
-  font-weight: 600;
-}
-
 .reclaim {
   margin: 0 0 var(--s-4);
   color: var(--dim);
