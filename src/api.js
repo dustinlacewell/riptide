@@ -68,11 +68,15 @@ async function streamNdjson(endpoint, payload, onProgress, signal) {
   return final;
 }
 
-export async function plan(paths, bytes) {
+/**
+ * Ask for a plan: paths to delete and action ids to run. The server keeps
+ * only what its scans offered.
+ */
+export async function plan(paths, bytes, actions = []) {
   const res = await fetch(`${BASE}/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ paths, bytes }),
+    body: JSON.stringify({ paths, actions, bytes }),
   });
   if (!res.ok) throw new Error(await errorText(res));
   return res.json();

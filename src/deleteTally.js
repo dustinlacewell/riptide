@@ -16,12 +16,14 @@ import { pathKey } from "./pathKey.js";
 
 /**
  * @param {{paths: string[], sizes: Map<string, string>, permanent: boolean,
- *          t: number}} opts sizes from sizesByPath
+ *          t: number, actions?: Array<{id: string, label: string}>}} opts
+ *   sizes from sizesByPath; actions from the plan, in run order
  */
-export function startRun({ paths, sizes, permanent, t }) {
+export function startRun({ paths, sizes, permanent, t, actions = [] }) {
   return {
     permanent,
     sizes,
+    actions: actions.map(({ id, label }) => ({ id, label, status: "waiting", line: null, error: null })),
     total: paths.length,
     done: 0,
     deleted: 0,
@@ -55,6 +57,19 @@ export function applyDeleteNote(run, note) {
     freed: (BigInt(run.freed) + size).toString(),
     wiping: new Set(run.wiping).add(key),
   };
+}
+
+/**
+ * One action note: {id, status: "running"|"ok"|"failed", error?} or
+ * {id, line}. The run keeps only each action's latest line.
+ */
+export function applyActionNote(run, note) {
+  const actions = run.actions.map((a) => {
+    if (a.id !== note.id) return a;
+    if (typeof note.line === "string") return { ...a, line: note.line };
+    return { ...a, status: note.status ?? a.status, error: note.error ?? null };
+  });
+  return { ...run, actions };
 }
 
 /** A wiped row has left the table. */

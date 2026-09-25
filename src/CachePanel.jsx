@@ -3,6 +3,7 @@ import * as api from "./api.js";
 import { reclaimOf } from "./reclaim.js";
 import { riskOf } from "./risk.js";
 import { enterDelay } from "./rowEnter.js";
+import ActionRow from "./ActionRow.jsx";
 import CacheRuleRows from "./CacheRuleRows.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import DeleteRun from "./DeleteRun.jsx";
@@ -32,6 +33,10 @@ const NOUN = ["location", "locations"];
  * Locations come from JSON packs in packs/ — pure data, no commands — so a
  * pack can be shared by sending the file. Sizes come from the MFT, which is
  * why the dev server runs elevated.
+ *
+ * A pack entry may instead link an action: a cleanup the tool's own command
+ * does (pnpm store prune, docker builder prune). Those list after the
+ * caches, and run after the paths are deleted.
  */
 export default function CachePanel({
   root,
@@ -66,6 +71,11 @@ export default function CachePanel({
   const [opened, setOpened] = useState(() => new Set());
   const [scannedAt, setScannedAt] = useState(0);
   const [untouched, setUntouched] = useState({ on: false, days: DEFAULT_UNTOUCHED });
+  // Actions the scan listed, and the ids of the ones picked. Nothing is
+  // picked by default, and Select all leaves them alone: each runs a
+  // command, so each is chosen on its own.
+  const [actions, setActions] = useState([]);
+  const [pickedIds, setPickedIds] = useState(() => new Set());
 
   const toggleOpen = useCallback((id) => {
     setOpened((prev) => {
@@ -96,11 +106,18 @@ export default function CachePanel({
     telemetry.start();
 
     setArrived([]);
+    setActions([]);
+    setPickedIds(new Set());
     // Project ages are read against the scan, not against each render.
     setScannedAt(Date.now());
 
     try {
       const done = await api.caches({ disabled, root }, (note) => {
+        if (note.type === "actions") {
+          setPacks(note.packs ?? []);
+          setActions(note.actions);
+          return;
+        }
         if (note.type === "found") {
           // One message per drive, already sized. Append rather than replace:
           // a later drive adds to the list, it does not supersede it.
@@ -163,7 +180,23 @@ export default function CachePanel({
       ),
     [found, spared, flow.refused],
   );
-  const reclaim = useMemo(() => reclaimOf(selected, found), [selected, found]);
+  const pickedActions = useMemo(
+    () => actions.filter((a) => a.available && pickedIds.has(a.action)),
+    [actions, pickedIds],
+  );
+  const reclaim = useMemo(
+    () => reclaimOf(selected, found, pickedActions, actions),
+    [selected, found, pickedActions, actions],
+  );
+
+  const pickAction = useCallback((id, picked) => {
+    setPickedIds((prev) => {
+      const next = new Set(prev);
+      if (picked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   const setChecked = useCallback((paths, checked) => {
     setSpared((prev) => {
@@ -186,11 +219,11 @@ export default function CachePanel({
   // would otherwise repeat the same warning a thousand times.
   const cautions = useMemo(() => {
     const byId = new Map();
-    for (const c of selected) {
+    for (const c of [...selected, ...pickedActions]) {
       if (riskOf(c) === "caution" && !byId.has(c.id)) byId.set(c.id, c);
     }
     return [...byId.values()];
-  }, [selected]);
+  }, [selected, pickedActions]);
 
   // One file per cache means 32 packs; group them by ecosystem so the header
   // reads as five chips rather than thirty-two.
@@ -265,7 +298,7 @@ export default function CachePanel({
 
       <DeleteRun run={flow.run} noun={NOUN} />
 
-      {arrived.length > 0 && (
+      {(arrived.length > 0 || actions.length > 0) && (
         <div className="results">
           <div className="results-main">
             <div className="bulk">
@@ -281,11 +314,11 @@ export default function CachePanel({
               />
             </div>
 
-            {found.length === 0 && (
+            {arrived.length > 0 && found.length === 0 && (
               <p className="empty">No project untouched for {untouched.days} days.</p>
             )}
 
-            {found.length > 0 && (
+            {(found.length > 0 || actions.length > 0) && (
               <table className={`hits caches${painting ? " painting" : ""}`}>
                 <thead>
                   <tr>
@@ -317,6 +350,18 @@ export default function CachePanel({
                     />
                   ))}
                 </tbody>
+                {actions.length > 0 && (
+                  <tbody className="actions">
+                    {actions.map((action) => (
+                      <ActionRow
+                        key={action.action}
+                        action={action}
+                        checked={pickedIds.has(action.action)}
+                        onChange={(picked) => pickAction(action.action, picked)}
+                      />
+                    ))}
+                  </tbody>
+                )}
               </table>
             )}
           </div>
@@ -328,13 +373,15 @@ export default function CachePanel({
             permanent={flow.permanent}
             busy={flow.planning}
             disabled={flow.deleting}
-            onZap={() => flow.preparePlan(selected, reclaim.selected)}
+            onZap={() =>
+              flow.preparePlan(selected, reclaim.selected, pickedActions.map((a) => a.action))
+            }
           >
             {cautions.length > 0 && (
               <Callout tone="caution" title="Read before deleting">
                 <ul>
                   {cautions.map((c) => (
-                    <li key={c.path}>
+                    <li key={c.id}>
                       <strong>{c.label}</strong> — {c.riskNote}
                     </li>
                   ))}
@@ -345,7 +392,7 @@ export default function CachePanel({
         </div>
       )}
 
-      {summary && arrived.length === 0 && (
+      {summary && arrived.length === 0 && actions.length === 0 && (
         <p className="empty">No known caches found on this machine.</p>
       )}
 

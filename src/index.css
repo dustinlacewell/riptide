@@ -702,6 +702,61 @@ button.primary:disabled {
   color: var(--failed);
 }
 
+/* Actions in a run: one line of status, then the command's latest output. */
+.action-runs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-run {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.action-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.action-run-label {
+  font-weight: 500;
+}
+
+.action-run-status {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+}
+
+.action-run.action-ok .glyph {
+  color: var(--done);
+}
+
+.action-run.action-failed .glyph,
+.action-run.action-failed .action-run-status {
+  color: var(--failed);
+}
+
+.action-run.action-running .glyph {
+  color: var(--current);
+}
+
+.action-run-line {
+  overflow: hidden;
+  padding-left: 20px;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-caps);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A deleted row wipes out left to right, then the panel drops it. Each
    cell clips on its own: table rows do not clip reliably. */
 .hits tr.row-out > td {
@@ -1013,6 +1068,40 @@ button.sort .arrow {
   color: var(--refused);
 }
 
+/* An action row runs a command in place of a delete. One that cannot run
+   here stays listed, dimmed, with the reason. */
+.hits tr.action-row {
+  cursor: default;
+}
+
+.hits tr.action-row .grip {
+  color: var(--dim);
+}
+
+.hits tr.unavailable td,
+.hits tr.unavailable .cache-label {
+  color: var(--dim);
+}
+
+.command-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command {
+  max-width: 620px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size-unknown {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+}
+
 .hits td.risk-cell {
   width: 1%;
   white-space: nowrap;
@@ -1174,6 +1263,33 @@ button.twist:hover .caret {
 
 .preview .more {
   color: var(--dim);
+}
+
+.dialog-subhead {
+  margin: 0 0 var(--s-2);
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preview-commands li {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-1) 0;
+}
+
+.preview-action {
+  font-family: var(--font-ui);
+  font-weight: 500;
+}
+
+.preview-command {
+  overflow: hidden;
+  color: var(--dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dialog .callout {

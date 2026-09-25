@@ -8,6 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  applyActionNote,
   applyDeleteNote,
   fateClass,
   fateOf,
@@ -97,4 +98,30 @@ test("the receipt times from the start when the server sent no time", () => {
 test("the receipt names what was deleted", () => {
   const line = runReceiptLine({ freed: "0", deleted: 1, ms: 0 }, ["location", "locations"]);
   assert.equal(line, "freed 0 B · 1 location · 0.0 s");
+});
+
+test("actions: each keeps its status and only its latest line", () => {
+  let run = startRun({
+    paths: [],
+    sizes: new Map(),
+    permanent: false,
+    t: 0,
+    actions: [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+    ],
+  });
+  assert.deepEqual(run.actions.map((a) => a.status), ["waiting", "waiting"]);
+
+  run = applyActionNote(run, { id: "a", status: "running" });
+  run = applyActionNote(run, { id: "a", line: "one" });
+  run = applyActionNote(run, { id: "a", line: "two" });
+  run = applyActionNote(run, { id: "a", status: "failed", error: "exit code 1" });
+  run = applyActionNote(run, { id: "b", status: "ok" });
+
+  assert.deepEqual(run.actions, [
+    { id: "a", label: "A", status: "failed", line: "two", error: "exit code 1" },
+    { id: "b", label: "B", status: "ok", line: null, error: null },
+  ]);
+  assert.equal(run.freed, "0", "an action adds nothing to freed");
 });

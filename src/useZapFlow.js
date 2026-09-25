@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import * as api from "./api.js";
 import {
+  applyActionNote,
   applyDeleteNote,
   finishRun,
   removedFromView,
@@ -14,7 +15,8 @@ import { useWipeQueue } from "./useWipeQueue.js";
  * The plan / confirm / delete cycle, shared by the Zap and Caches tabs.
  *
  * Both tabs end at the same place: a set of paths, a confirmation, then a
- * streamed delete. Only the way the paths are found differs, so that part
+ * streamed delete. The Caches tab can add actions, which run after the
+ * paths. Only the way the paths are found differs, so that part
  * stays in the panels and this holds the rest.
  *
  * While a delete runs, `run` (see deleteTally.js) says which rows are wiping
@@ -39,13 +41,17 @@ export function useZapFlow(onDeleted) {
   // Sizes of what the plan was made from, so the run can count bytes freed.
   const sizes = useRef(new Map());
 
-  /** @param {Array<{path: string, bytes: string}>} items */
-  const preparePlan = useCallback(async (items, bytes) => {
+  /**
+   * @param {Array<{path: string, bytes: string}>} items
+   * @param {string} bytes
+   * @param {string[]} [actions] action ids to run after the paths
+   */
+  const preparePlan = useCallback(async (items, bytes, actions = []) => {
     setError(null);
     setPlanning(true);
     try {
       sizes.current = sizesByPath(items);
-      const plan = await api.plan(items.map((i) => i.path), bytes);
+      const plan = await api.plan(items.map((i) => i.path), bytes, actions);
       if (plan.refused.length > 0) {
         setRefused((prev) => new Set([...prev, ...refusedPaths(plan.refused)]));
       }
@@ -81,6 +87,7 @@ export function useZapFlow(onDeleted) {
         sizes: sizes.current,
         permanent,
         t: performance.now(),
+        actions: plan.actions ?? [],
       }),
     );
 
@@ -92,6 +99,10 @@ export function useZapFlow(onDeleted) {
         // A scan started meanwhile clears the run; its notes then have
         // nowhere to go.
         onProgress: (note) => {
+          if (note.type === "action") {
+            setRun((r) => r && applyActionNote(r, note));
+            return;
+          }
           setRun((r) => r && applyDeleteNote(r, note));
           if (note.ok) dropAfterWipe([note.path]);
         },

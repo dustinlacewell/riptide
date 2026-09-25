@@ -39,6 +39,8 @@ const GLYPHS = {
   done: { box: "0 0 12 12", stroke: 1.6, body: <path d="M1.5 6.5 4.5 9.5 10.5 2.5" /> },
   failed: { box: "0 0 12 12", stroke: 1.6, body: <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /> },
   caret: { box: "0 0 12 12", stroke: 1.6, body: <path d="M4.5 2.5 8 6l-3.5 3.5" /> },
+  // A shell prompt: the row runs a command rather than deleting a folder.
+  command: { box: "0 0 12 12", stroke: 1.6, body: <path d="M1.5 3 4.5 6l-3 3M6 9.5h4.5" /> },
   lock: {
     box: "0 0 14 14",
     stroke: 1.6,

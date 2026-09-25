@@ -27,15 +27,22 @@ export default function ReclaimPanel({
         count={reclaim.count}
         noun={noun}
         bytes={reclaim.selected}
+        commands={reclaim.commands}
         anyCaution={reclaim.anyCaution}
         permanent={permanent}
         busy={busy}
-        disabled={disabled || reclaim.count === 0}
+        disabled={disabled || reclaim.count + reclaim.commands === 0}
         onClick={onZap}
       />
       <span className={permanent ? "reclaim-dest permanent" : "reclaim-dest"}>
-        {permanent ? "Deletes permanently" : "Sends to the Recycle Bin"}
+        {destination(reclaim, permanent)}
       </span>
     </aside>
   );
+}
+
+/** Where the picks go. A command has no Recycle Bin. */
+function destination({ count, commands }, permanent) {
+  if (count === 0 && commands > 0) return "Runs the commands";
+  return permanent ? "Deletes permanently" : "Sends to the Recycle Bin";
 }

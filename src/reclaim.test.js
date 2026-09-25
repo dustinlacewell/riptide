@@ -22,8 +22,22 @@ test("reclaim splits the selection into safe and caution bytes", () => {
     selected: "150",
     total: "175",
     count: 2,
+    commands: 0,
     anyCaution: true,
   });
+});
+
+test("actions add only known bytes; an unknown size adds nothing", () => {
+  const row = { path: "a", bytes: "100" };
+  const known = { action: "docker-builder-prune", bytes: "40" };
+  const unknown = { action: "wsl-compact", bytes: null, risk: "caution" };
+  const r = reclaimOf([row], [row], [known, unknown], [known, unknown]);
+  assert.equal(r.selected, "140");
+  assert.equal(r.total, "140");
+  assert.equal(r.caution, "0");
+  assert.equal(r.count, 1);
+  assert.equal(r.commands, 2);
+  assert.equal(r.anyCaution, true, "a caution action with no size still warns");
 });
 
 test("reclaim sums without losing precision", () => {
