@@ -24,6 +24,7 @@ import { driveOf } from "./caches/expand.js";
 import { createMapStore } from "./map/store.js";
 import { readMap } from "./map/read.js";
 import { childrenPage } from "./map/page.js";
+import { offerPicks } from "./map/offer.js";
 
 const BASE = "/__riptide";
 
@@ -90,6 +91,9 @@ async function route(req, res) {
   }
   if (req.method === "GET" && url.pathname === "/map/node") {
     return mapNodeRoute(url, res);
+  }
+  if (req.method === "POST" && url.pathname === "/map/offer") {
+    return mapOfferRoute(req, res);
   }
 
   json(res, 404, { error: "no such endpoint" });
@@ -418,12 +422,16 @@ async function zapRoute(req, res) {
       res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
   });
 
+  const deleted = results.filter((r) => r.ok).map((r) => r.path);
+  // Before the done line: a map that reloads on it must see the change.
+  maps.removePaths(deleted);
+
   res.write(
     JSON.stringify({
       type: "done",
       permanent: permanent === true,
       elapsedMs: Date.now() - started,
-      deleted: results.filter((r) => r.ok).map((r) => r.path),
+      deleted,
       failed: results.filter((r) => !r.ok),
     }) + "\n",
   );
@@ -494,6 +502,29 @@ function mapNodeRoute(url, res) {
   });
   if (!page) return json(res, 404, { error: "no such folder" });
   json(res, 200, { gen: slot.gen, ...page });
+}
+
+/**
+ * Folders picked on the map, as paths. What passes is offered under
+ * "map", so /plan accepts it — with the depth rule still in force.
+ */
+async function mapOfferRoute(req, res) {
+  const { drive, gen, recNos } = await body(req);
+
+  if (!Array.isArray(recNos) || recNos.length === 0) {
+    return json(res, 400, { error: "recNos must be a non-empty array" });
+  }
+  const { slot, stale } = maps.at(typeof drive === "string" ? drive : "", gen);
+  if (stale) {
+    return json(res, 409, { error: "the map changed", gen: stale.gen, read: stale.read });
+  }
+  if (!slot) return json(res, 404, { error: "no map for that drive" });
+
+  const result = offerPicks(slot.snap, recNos);
+  // A new pick replaces the last one's offer.
+  offered.clear("map");
+  offered.add(result.paths, "map");
+  json(res, 200, result);
 }
 
 // ---------------------------------------------------------------------------

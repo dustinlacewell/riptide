@@ -11,6 +11,7 @@ import { useStoppable } from "./useStoppable.js";
  *   show(id)     show a folder of the current map
  *   prefetch(id) fetch a folder's page ahead of a click
  *   refresh()    show the current folder again, after a delete
+ *   offer(recNos) offer picked folders for deletion
  *
  * Pages are cached by (gen, id). When the server says the map changed, a
  * change to the same read (a delete) keeps the folder on show; a new read
@@ -79,9 +80,30 @@ export function useSpaceMap() {
     [fetchPage],
   );
 
+  // After a delete the server's map has moved on; skip the cache so the
+  // request can find that out.
   const refresh = useCallback(() => {
-    if (page) show(page.node.id);
+    if (!page) return;
+    cache.current.clear();
+    show(page.node.id);
   }, [page, show]);
+
+  // A delete between the pick and the offer changes the gen, not the ids,
+  // so the same picks are offered once more under the new gen.
+  const offer = useCallback(
+    async (recNos) => {
+      const m = mapRef.current;
+      if (!m) throw new Error("read a drive first");
+      try {
+        return await api.mapOffer({ drive: m.drive, gen: m.gen, recNos });
+      } catch (e) {
+        if (!e.stale || e.stale.read !== m.read) throw e;
+        adopt({ ...m, gen: e.stale.gen });
+        return api.mapOffer({ drive: m.drive, gen: e.stale.gen, recNos });
+      }
+    },
+    [adopt],
+  );
 
   const read = useCallback(
     async (root, { patterns, disabled } = {}) => {
@@ -130,7 +152,8 @@ export function useSpaceMap() {
       show,
       prefetch,
       refresh,
+      offer,
     }),
-    [map, page, reading, loading, error, telemetry, run.stopped, run.stop, read, show, prefetch, refresh],
+    [map, page, reading, loading, error, telemetry, run.stopped, run.stop, read, show, prefetch, refresh, offer],
   );
 }

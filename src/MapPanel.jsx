@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ConfirmDialog from "./ConfirmDialog.jsx";
+import DeleteRun from "./DeleteRun.jsx";
 import { bytes } from "./format.js";
+import { dropPick, dropRecords, reclaimItems, togglePick } from "./mapPicks.js";
 import { drillable } from "./mapView.js";
 import MapList from "./MapList.jsx";
+import MapTray from "./MapTray.jsx";
+import { pathKey } from "./pathKey.js";
+import ReclaimPanel from "./ReclaimPanel.jsx";
+import { reclaimOf } from "./reclaim.js";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
 import Treemap from "./Treemap.jsx";
 import { useSpaceMap } from "./useSpaceMap.js";
+import { useZapFlow } from "./useZapFlow.js";
 import Callout from "./ui/Callout.jsx";
+
+const NOUN = ["folder", "folders"];
 
 const PREFETCH = 3;
 
@@ -21,8 +31,6 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
   const [hoverId, setHoverId] = useState(null);
   const prefetched = useRef(null);
 
-  const busy = space.reading;
-  useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
   const open = useCallback((row) => space.show(row.id), [space]);
 
@@ -34,7 +42,10 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
       if (!tile || !page) return;
       if (prefetched.current !== page) {
         prefetched.current = page;
-        page.children.filter(drillable).slice(0, PREFETCH).forEach((c) => space.prefetch(c.id));
+        page.children
+          .filter((c) => c.hasKids)
+          .slice(0, PREFETCH)
+          .forEach((c) => space.prefetch(c.id));
       }
       if (drillable(tile)) space.prefetch(tile.id);
     },
@@ -47,7 +58,54 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
   }, [page, space]);
 
   const extras = useMemo(() => gapTiles(page, map), [page, map]);
-  const selected = useMemo(() => new Set(), []);
+
+  const [picks, setPicks] = useState(() => new Map());
+  const selected = useMemo(() => new Set(picks.keys()), [picks]);
+  const toggle = useCallback((row) => setPicks((prev) => togglePick(prev, row)), []);
+  const [offerRefused, setOfferRefused] = useState([]);
+  // pathKey -> record number of what the last offer sent, so a deleted
+  // path can leave the tray.
+  const offeredRecs = useRef(new Map());
+
+  const onDeleted = useCallback(
+    (paths) => {
+      const recNos = paths.map((p) => offeredRecs.current.get(pathKey(p))).filter((n) => n !== undefined);
+      setPicks((prev) => dropRecords(prev, recNos));
+      space.refresh();
+    },
+    [space],
+  );
+  const flow = useZapFlow(onDeleted);
+
+  const items = useMemo(() => reclaimItems(picks), [picks]);
+  const reclaim = useMemo(
+    () => reclaimOf(items, [{ bytes: String(Math.round(map?.stats.rootBytes ?? 0)) }]),
+    [items, map],
+  );
+
+  const busy = space.reading || flow.planning || flow.deleting;
+  useEffect(() => onBusy?.(busy), [busy, onBusy]);
+
+  const read = () => {
+    setPicks(new Map());
+    setOfferRefused([]);
+    flow.setError(null);
+    flow.clearRun();
+    space.read(root, { patterns: prefs.patterns, disabled: prefs.disabledCaches });
+  };
+
+  const zap = async () => {
+    flow.setError(null);
+    setOfferRefused([]);
+    try {
+      const offer = await space.offer([...picks.values()].map((p) => p.recNo));
+      offeredRecs.current = new Map(offer.items.map((i) => [pathKey(i.path), i.recNo]));
+      setOfferRefused(offer.refused);
+      if (offer.items.length > 0) await flow.preparePlan(offer.items, offer.bytes);
+    } catch (e) {
+      flow.setError(e.message);
+    }
+  };
 
   return (
     <>
@@ -60,13 +118,7 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
           recent={recentRoots}
           placeholder="C:\"
         />
-        <button
-          className="primary"
-          onClick={() =>
-            space.read(root, { patterns: prefs.patterns, disabled: prefs.disabledCaches })
-          }
-          disabled={space.reading || !root}
-        >
+        <button className="primary" onClick={read} disabled={space.reading || !root}>
           {space.reading ? "Reading…" : "Read drive"}
         </button>
         {space.reading && <button onClick={space.stop}>Stop</button>}
@@ -81,6 +133,21 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
       />
 
       {space.error && <p className="error">{space.error}</p>}
+      {flow.error && <p className="error">{flow.error}</p>}
+
+      {offerRefused.length > 0 && (
+        <Callout tone="refused" title={`${offerRefused.length} picked ${offerRefused.length === 1 ? "folder" : "folders"} refused`}>
+          <ul className="map-refused">
+            {offerRefused.map((r) => (
+              <li key={r.path}>
+                {r.path}: {r.reason}
+              </li>
+            ))}
+          </ul>
+        </Callout>
+      )}
+
+      <DeleteRun run={flow.run} noun={NOUN} />
 
       {page && (
         <div className="map">
@@ -120,16 +187,38 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
               hoverId={hoverId}
               onHover={onHover}
               onOpen={open}
+              onToggle={toggle}
             />
-            <MapList
-              page={page}
-              selected={selected}
-              hoverId={hoverId}
-              onHover={onHover}
-              onOpen={open}
-              onUp={up}
-            />
+            <div className="map-side">
+              {picks.size > 0 && (
+                <ReclaimPanel
+                  reclaim={reclaim}
+                  noun={NOUN}
+                  permanent={flow.permanent}
+                  busy={flow.planning}
+                  disabled={flow.deleting}
+                  onZap={zap}
+                >
+                  <MapTray
+                    picks={picks}
+                    onDrop={(id) => setPicks((prev) => dropPick(prev, id))}
+                    onClear={() => setPicks(new Map())}
+                  />
+                </ReclaimPanel>
+              )}
+              <MapList
+                page={page}
+                selected={selected}
+                hoverId={hoverId}
+                onHover={onHover}
+                onOpen={open}
+                onUp={up}
+                onToggle={toggle}
+              />
+            </div>
           </div>
+
+          <p className="map-note">Ctrl-click a tile, or tick a row, to pick it for deletion.</p>
 
           {page.node.id === 0 && map?.stats.volumeUsed === null && (
             <p className="map-note">
@@ -137,6 +226,18 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
             </p>
           )}
         </div>
+      )}
+
+      {flow.pending && (
+        <ConfirmDialog
+          plan={flow.pending}
+          noun={NOUN}
+          anyCaution={reclaim.anyCaution}
+          permanent={flow.permanent}
+          onPermanentChange={flow.setPermanent}
+          onCancel={flow.cancelPlan}
+          onConfirm={flow.confirmZap}
+        />
       )}
     </>
   );

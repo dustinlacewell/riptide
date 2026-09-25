@@ -129,6 +129,24 @@ export async function mapNode({ drive, gen, id, depth = 2, limit = 40 }, { signa
   return res.json();
 }
 
+/**
+ * Offer folders picked on a map for deletion. Resolves with
+ * {paths, items, bytes, refused}; a stale gen rejects like mapNode.
+ */
+export async function mapOffer({ drive, gen, recNos }) {
+  const res = await fetch(`${BASE}/map/offer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ drive, gen, recNos }),
+  });
+  if (res.status === 409) {
+    const body = await res.json();
+    throw Object.assign(new Error(body.error), { stale: { gen: body.gen, read: body.read } });
+  }
+  if (!res.ok) throw new Error(await errorText(res));
+  return res.json();
+}
+
 export function zap({ token, permanent, confirmCount, onProgress }) {
   return streamNdjson("/zap", { token, permanent, confirmCount }, onProgress);
 }
