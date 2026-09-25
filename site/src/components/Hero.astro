@@ -22,9 +22,7 @@ import Demo from "./Demo.jsx";
        The app renders only in the browser; Astro shows the fallback figure
        until it mounts. -->
   <div class="stage wide">
-    <Demo client:only="react">
-      <Telemetry slot="fallback" />
-    </Demo>
+    <Demo client:load />
   </div>
   <div class="wrap narrow">
     <Telemetry />
