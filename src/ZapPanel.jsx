@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
-import { bytes, sumBytes } from "./format.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
 import ZapStatus from "./ZapStatus.jsx";
+import ReclaimPanel from "./ReclaimPanel.jsx";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
+import { reclaimOf } from "./reclaim.js";
+import { enterDelay } from "./rowEnter.js";
 import { useScanStream } from "./useScanStream.js";
 import Callout from "./ui/Callout.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
@@ -66,10 +68,7 @@ export default function ZapPanel({
       ),
     [hits, spared, flow.refused],
   );
-  const selectedBytes = useMemo(
-    () => sumBytes(selected.map((h) => h.bytes)),
-    [selected],
-  );
+  const reclaim = useMemo(() => reclaimOf(selected, hits), [selected, hits]);
 
   const busy = scanning || flow.planning || flow.zapping !== null;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
@@ -158,86 +157,66 @@ export default function ZapPanel({
 
       <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
 
-      {result && (
-        <>
-          <div className="summary">
-            <span>
-              <strong>{hits.length}</strong> found
-            </span>
-            <span>
-              <strong>{selected.length}</strong> selected
-            </span>
-            <span>
-              <strong>{bytes(selectedBytes)}</strong> to reclaim
-            </span>
+      {result && hits.length > 0 && (
+        <div className="results">
+          <div className="results-main">
+            <div className="bulk">
+              <button onClick={() => setSpared(new Set())}>Select all</button>
+              <button onClick={() => setSpared(new Set(hits.map((h) => h.path)))}>
+                Select none
+              </button>
+            </div>
+
+            <table className={`hits${painting ? " painting" : ""}`}>
+              <thead>
+                <tr>
+                  <th />
+                  <th />
+                  <SortHeader
+                    columns={COLUMNS}
+                    sort={sort}
+                    onSort={(key) => setSort((s) => nextSort(s, key))}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {hits.map((hit, i) => (
+                  <HitRow
+                    key={hit.path}
+                    hit={hit}
+                    risk={riskOf(hit, flow.refused)}
+                    spared={spared.has(hit.path)}
+                    enterDelay={enterDelay(i)}
+                    setChecked={setChecked}
+                    onPointerDown={onPointerDown}
+                    onPointerEnter={onPointerEnter}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          {hits.length > 0 && (
-            <>
-              <div className="bulk">
-                <button onClick={() => setSpared(new Set())}>Select all</button>
-                <button onClick={() => setSpared(new Set(hits.map((h) => h.path)))}>
-                  Select none
-                </button>
-              </div>
-
-              <table className={`hits${painting ? " painting" : ""}`}>
-                <thead>
-                  <tr>
-                    <th />
-                    <th />
-                    <SortHeader
-                      columns={COLUMNS}
-                      sort={sort}
-                      onSort={(key) => setSort((s) => nextSort(s, key))}
-                    />
-                  </tr>
-                </thead>
-                <tbody>
-                  {hits.map((hit) => (
-                    <HitRow
-                      key={hit.path}
-                      hit={hit}
-                      risk={riskOf(hit, flow.refused)}
-                      spared={spared.has(hit.path)}
-                      setChecked={setChecked}
-                      onPointerDown={onPointerDown}
-                      onPointerEnter={onPointerEnter}
-                    />
-                  ))}
-                </tbody>
-              </table>
-
-              <button
-                className="danger"
-                onClick={() =>
-                  flow.preparePlan(selected.map((h) => h.path), selectedBytes)
-                }
-                disabled={
-                  selected.length === 0 || flow.zapping !== null || flow.planning
-                }
-              >
-                {flow.planning ? (
-                  "Checking…"
-                ) : (
-                  <>
-                    Zap {selected.length}{" "}
-                    {selected.length === 1 ? "folder" : "folders"}
-                    {" · "}
-                    {bytes(selectedBytes)}
-                  </>
-                )}
-              </button>
-            </>
-          )}
-
-          {hits.length === 0 && <p className="empty">Nothing matched.</p>}
-        </>
+          <ReclaimPanel
+            reclaim={reclaim}
+            replayKey={telemetry.state.finishedAt}
+            noun={NOUN}
+            permanent={flow.permanent}
+            busy={flow.planning}
+            disabled={flow.zapping !== null}
+            onZap={() => flow.preparePlan(selected.map((h) => h.path), reclaim.selected)}
+          />
+        </div>
       )}
+
+      {result && hits.length === 0 && <p className="empty">Nothing matched.</p>}
 
       {flow.pending && (
         <ConfirmDialog
           plan={flow.pending}
+          noun={NOUN}
+          anyCaution={reclaim.anyCaution}
+          permanent={flow.permanent}
+          onPermanentChange={flow.setPermanent}
           onCancel={flow.cancelPlan}
           onConfirm={flow.confirmZap}
         />
@@ -245,6 +224,8 @@ export default function ZapPanel({
     </>
   );
 }
+
+const NOUN = ["folder", "folders"];
 
 /** "D:" from "d:\code", for the telemetry title; null for a UNC root. */
 function driveOf(root) {

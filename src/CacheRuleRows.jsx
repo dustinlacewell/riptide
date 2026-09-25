@@ -17,6 +17,7 @@ import Glyph from "./ui/Glyph.jsx";
  */
 export default function CacheRuleRows({
   rule,
+  enterDelay = 0,
   refused,
   open,
   onToggle,
@@ -42,7 +43,7 @@ export default function CacheRuleRows({
 
   return (
     <>
-      <tr className={ruleClass(risk, none, open)}>
+      <tr className={ruleClass(risk, none, open)} style={{ animationDelay: `${enterDelay}ms` }}>
         <td className="grip">
           {!lone && (
             <button
@@ -144,6 +145,7 @@ function MemberRow({ cache, risk, spared, setChecked, onPointerDown, onPointerEn
 function ruleClass(risk, none, open) {
   return [
     "rule",
+    "row-in",
     risk === "safe" ? "" : risk,
     none && risk !== "refused" ? "spared" : "",
     open ? "open" : "",

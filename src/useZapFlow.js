@@ -21,6 +21,9 @@ export function useZapFlow(onDeleted) {
   // Paths the server screened out. The screen is fixed, so once refused a
   // path stays refused; each plan adds to the set rather than replacing it.
   const [refused, setRefused] = useState(() => new Set());
+  // Held here, not in the dialog: the Zap button beside the table turns red
+  // with it, so it outlives a cancelled confirmation.
+  const [permanent, setPermanent] = useState(false);
 
   const preparePlan = useCallback(async (paths, bytes) => {
     setError(null);
@@ -39,7 +42,7 @@ export function useZapFlow(onDeleted) {
   }, []);
 
   const confirmZap = useCallback(
-    async (permanent) => {
+    async () => {
       const plan = pending;
       if (!plan) return;
 
@@ -64,7 +67,7 @@ export function useZapFlow(onDeleted) {
         setZapping(null);
       }
     },
-    [pending, onDeleted],
+    [pending, permanent, onDeleted],
   );
 
   return {
@@ -74,6 +77,8 @@ export function useZapFlow(onDeleted) {
     outcome,
     error,
     refused,
+    permanent,
+    setPermanent,
     setError,
     setOutcome,
     preparePlan,

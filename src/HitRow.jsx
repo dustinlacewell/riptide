@@ -10,6 +10,7 @@ export default function HitRow({
   hit,
   risk,
   spared,
+  enterDelay = 0,
   setChecked,
   onPointerDown,
   onPointerEnter,
@@ -23,7 +24,11 @@ export default function HitRow({
       };
 
   return (
-    <tr className={rowClass(risk, spared)} {...paint}>
+    <tr
+      className={rowClass(risk, spared)}
+      style={{ animationDelay: `${enterDelay}ms` }}
+      {...paint}
+    >
       <td>
         <RowPick
           risk={risk}
@@ -46,7 +51,7 @@ export default function HitRow({
 }
 
 function rowClass(risk, spared) {
-  return [risk === "safe" ? "" : risk, spared && risk !== "refused" ? "spared" : ""]
+  return ["row-in", risk === "safe" ? "" : risk, spared && risk !== "refused" ? "spared" : ""]
     .filter(Boolean)
     .join(" ");
 }

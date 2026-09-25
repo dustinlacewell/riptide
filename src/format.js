@@ -10,6 +10,26 @@ export function bytes(value) {
   return `${n < 10 && unit > 0 ? n.toFixed(1) : Math.round(n)} ${UNITS[unit]}`;
 }
 
+/** Index into the byte units for a value: 0 = B, 3 = GB. */
+export function unitOf(value) {
+  let n = Number(value);
+  let unit = 0;
+  while (n >= 1024 && unit < UNITS.length - 1) {
+    n /= 1024;
+    unit += 1;
+  }
+  return unit;
+}
+
+/**
+ * A byte count split for a hero figure: {value: "44.6", unit: "GB"}.
+ * `unit` pins the unit, so a figure counting up keeps its final unit.
+ */
+export function bytesParts(value, unit = unitOf(value)) {
+  const n = Number(value) / 1024 ** unit;
+  return { value: unit === 0 ? String(Math.round(n)) : n.toFixed(1), unit: UNITS[unit] };
+}
+
 /** Elapsed time as mm:ss.t — 16 700 ms is "00:16.7". */
 export function clockTime(ms) {
   const tenths = Math.max(0, Math.floor(ms / 100));

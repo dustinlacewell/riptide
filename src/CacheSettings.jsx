@@ -77,7 +77,7 @@ export default function CacheSettings({ disabled, onChange, onClose }) {
 
   return (
     <Dialog title="Cache configs" onClose={onClose} className="settings">
-      <p className="reclaim">
+      <p className="dialog-lede">
         {configs ? `${enabledCount} of ${configs.length} enabled` : "Loading…"}
       </p>
 

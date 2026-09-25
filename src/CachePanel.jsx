@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
-import { bytes, sumBytes } from "./format.js";
+import { reclaimOf } from "./reclaim.js";
 import { riskOf } from "./risk.js";
+import { enterDelay } from "./rowEnter.js";
 import CacheRuleRows from "./CacheRuleRows.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import CacheSettings from "./CacheSettings.jsx";
+import ReclaimPanel from "./ReclaimPanel.jsx";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
 import { useScanStream } from "./useScanStream.js";
@@ -17,6 +19,8 @@ import { useZapFlow } from "./useZapFlow.js";
 import { useRowPainter } from "./useRowPainter.js";
 import { CACHE_GROUP_COLUMNS, DEFAULT_SORT, nextSort } from "./sort.js";
 import { groupHits, sortGroups } from "./group.js";
+
+const NOUN = ["location", "locations"];
 
 /**
  * The Caches tab: known tool caches, found by path rather than by search.
@@ -143,14 +147,7 @@ export default function CachePanel({
       ),
     [found, spared, flow.refused],
   );
-  const selectedBytes = useMemo(
-    () => sumBytes(selected.map((c) => c.bytes)),
-    [selected],
-  );
-  const totalBytes = useMemo(
-    () => sumBytes(found.map((c) => c.bytes)),
-    [found],
-  );
+  const reclaim = useMemo(() => reclaimOf(selected, found), [selected, found]);
 
   const setChecked = useCallback((paths, checked) => {
     setSpared((prev) => {
@@ -253,89 +250,69 @@ export default function CachePanel({
       <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
 
       {found.length > 0 && (
-        <>
-          <div className="summary">
-            <span>
-              <strong>{rules.length}</strong>{" "}
-              {rules.length === 1 ? "cache" : "caches"}
-            </span>
-            <span>
-              <strong>{found.length.toLocaleString()}</strong> found
-            </span>
-            <span>
-              <strong>{selected.length.toLocaleString()}</strong> selected
-            </span>
-            <span>
-              <strong>{bytes(selectedBytes)}</strong> to reclaim
-            </span>
-            <span className="strategy">{bytes(totalBytes)} total</span>
-          </div>
+        <div className="results">
+          <div className="results-main">
+            <div className="bulk">
+              <button onClick={() => setSpared(new Set())}>Select all</button>
+              <button onClick={() => setSpared(new Set(found.map((c) => c.path)))}>
+                Select none
+              </button>
+            </div>
 
-          <div className="bulk">
-            <button onClick={() => setSpared(new Set())}>Select all</button>
-            <button onClick={() => setSpared(new Set(found.map((c) => c.path)))}>
-              Select none
-            </button>
-          </div>
-
-          <table className={`hits caches${painting ? " painting" : ""}`}>
-            <thead>
-              <tr>
-                <th />
-                <th />
-                <th className="plain">Risk</th>
-                <SortHeader
-                  columns={CACHE_GROUP_COLUMNS}
-                  sort={sort}
-                  onSort={(key) => setSort((s) => nextSort(s, key))}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <CacheRuleRows
-                  key={rule.id}
-                  rule={rule}
-                  refused={flow.refused}
-                  open={opened.has(rule.id)}
-                  onToggle={toggleOpen}
-                  spared={spared}
-                  setChecked={setChecked}
-                  onPointerDown={onPointerDown}
-                  onPointerEnter={onPointerEnter}
-                />
-              ))}
-            </tbody>
-          </table>
-
-          {cautions.length > 0 && (
-            <Callout tone="caution" title="Read before deleting">
-              <ul>
-                {cautions.map((c) => (
-                  <li key={c.path}>
-                    <strong>{c.label}</strong> — {c.riskNote}
-                  </li>
+            <table className={`hits caches${painting ? " painting" : ""}`}>
+              <thead>
+                <tr>
+                  <th />
+                  <th />
+                  <th className="plain">Risk</th>
+                  <SortHeader
+                    columns={CACHE_GROUP_COLUMNS}
+                    sort={sort}
+                    onSort={(key) => setSort((s) => nextSort(s, key))}
+                  />
+                </tr>
+              </thead>
+              <tbody>
+                {rules.map((rule, i) => (
+                  <CacheRuleRows
+                    key={rule.id}
+                    rule={rule}
+                    enterDelay={enterDelay(i)}
+                    refused={flow.refused}
+                    open={opened.has(rule.id)}
+                    onToggle={toggleOpen}
+                    spared={spared}
+                    setChecked={setChecked}
+                    onPointerDown={onPointerDown}
+                    onPointerEnter={onPointerEnter}
+                  />
                 ))}
-              </ul>
-            </Callout>
-          )}
+              </tbody>
+            </table>
+          </div>
 
-          <button
-            className="danger"
-            onClick={() => flow.preparePlan(selected.map((c) => c.path), selectedBytes)}
-            disabled={selected.length === 0 || flow.zapping !== null || flow.planning}
+          <ReclaimPanel
+            reclaim={reclaim}
+            replayKey={telemetry.state.finishedAt}
+            noun={NOUN}
+            permanent={flow.permanent}
+            busy={flow.planning}
+            disabled={flow.zapping !== null}
+            onZap={() => flow.preparePlan(selected.map((c) => c.path), reclaim.selected)}
           >
-            {flow.planning ? (
-              "Checking…"
-            ) : (
-              <>
-                Zap {selected.length.toLocaleString()}{" "}
-                {selected.length === 1 ? "location" : "locations"} ·{" "}
-                {bytes(selectedBytes)}
-              </>
+            {cautions.length > 0 && (
+              <Callout tone="caution" title="Read before deleting">
+                <ul>
+                  {cautions.map((c) => (
+                    <li key={c.path}>
+                      <strong>{c.label}</strong> — {c.riskNote}
+                    </li>
+                  ))}
+                </ul>
+              </Callout>
             )}
-          </button>
-        </>
+          </ReclaimPanel>
+        </div>
       )}
 
       {summary && found.length === 0 && (
@@ -353,6 +330,10 @@ export default function CachePanel({
       {flow.pending && (
         <ConfirmDialog
           plan={flow.pending}
+          noun={NOUN}
+          anyCaution={reclaim.anyCaution}
+          permanent={flow.permanent}
+          onPermanentChange={flow.setPermanent}
           onCancel={flow.cancelPlan}
           onConfirm={flow.confirmZap}
         />
