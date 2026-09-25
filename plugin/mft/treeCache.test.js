@@ -238,6 +238,32 @@ test("cache: a record older on disk than its journal entry is read again, howeve
   assert.deepEqual(fixed.tree.recent, []);
 });
 
+test("cache: a record torn during the full read is read again on the next update", async () => {
+  const volume = buildVolume({
+    records: {
+      5: { name: ".", parent: 5, isDirectory: true },
+      11: { name: "$Extend", parent: 5, isDirectory: true },
+      50: { name: "a.txt", parent: 5, size: 70 },
+    },
+  });
+  installJournal(volume, { changes: [] });
+  const at = 4 * 4096 + 50 * 1024; // record 50: a fix-up array that does not match
+  volume.buf.writeUInt16LE(3, at + 0x06);
+  volume.buf.writeUInt16LE(0xbeef, at + 0x30);
+  volume.buf.writeUInt16LE(0xdead, at + 510);
+
+  const cache = cacheOn(volume, { wallClock: () => 9e12 });
+  const full = await cache.get("C:");
+  assert.deepEqual(full.tree.recent, [50]);
+  const without = full.tree.ownBytes.get(5);
+
+  volume.write(50, { name: "a.txt", parent: 5, size: 70 }); // written whole now
+  const next = await cache.get("C:");
+  assert.equal(next.how, "delta");
+  assert.equal(next.tree.ownBytes.get(5), without + 70n);
+  assert.deepEqual(next.tree.recent, []);
+});
+
 test("cache: a journal that fails to read falls back to a full read", async () => {
   const run = journaled(8);
   let breakNext = false;

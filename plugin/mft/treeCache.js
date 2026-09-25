@@ -194,7 +194,6 @@ export function createTreeCache({
       tree.queryIds = queryIds(query);
       tree.journal = await journalStart(volume, tree, began - REPLAY_MARGIN_MS);
       tree.lsn = await readLogLsn({ read: volume.read, boot: tree.boot, mftRuns: tree.mftRuns, signal });
-      tree.recent = [];
       tree.version = 0;
       lastBytes = driveBytes(tree);
       held.set(key, tree);

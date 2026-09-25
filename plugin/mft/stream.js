@@ -119,7 +119,9 @@ export async function streamMftRecords({
           applyFixup(rec, boot.bytesPerSector);
         } catch {
           // A torn record on a live volume. Skip it rather than abort the
-          // whole scan; one bad record costs us one file, not the run.
+          // whole scan, and list it so a kept tree reads it again on its
+          // next update.
+          tree.recent.push(current);
           continue;
         }
 

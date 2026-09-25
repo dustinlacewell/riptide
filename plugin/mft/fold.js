@@ -16,6 +16,8 @@
  *   marks      counted file-name marks (filenames.js)
  *   files      what each file record added (files.js)
  *   journalRecord  record number of $Extend\$UsnJrnl, or null
+ *   recent     records to read again on the next update: torn when read,
+ *              or changed too recently to trust (apply.js)
  *
  * No I/O. The tree is updated in place.
  */
@@ -50,6 +52,7 @@ export function createTree({ size = 0, query = null } = {}) {
     query,
     files: createFileTable(size),
     journalRecord: null,
+    recent: [],
   };
 }
 
