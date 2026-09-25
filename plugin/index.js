@@ -16,10 +16,17 @@ import { loadPacks } from "./caches/load.js";
 import { resolveEntries } from "./caches/resolve.js";
 import { whereOf } from "./caches/pack.js";
 import { screenPaths, zapPaths } from "./zap.js";
+import { createOffered } from "./offered.js";
+import { buildPlan } from "./plan.js";
 import { runRipgrep } from "./grep/run.js";
 import { parseGlobs } from "./grep/args.js";
 
 const BASE = "/__riptide";
+
+/**
+ * Every path a scan has streamed to the client. /plan accepts only these.
+ */
+const offered = createOffered();
 
 /**
  * Plans are held server-side and referenced by token, so the zap endpoint
@@ -134,6 +141,9 @@ async function cachesRoute(req, res) {
   const off = new Set(Array.isArray(disabled) ? disabled : []);
   const entries = all.filter((e) => !off.has(e.id));
 
+  // A new cache scan replaces the last one's offer.
+  offered.clear("caches");
+
   if (entries.length === 0) {
     return json(res, 200, { found: [], packs, errors, sized: false });
   }
@@ -159,8 +169,10 @@ async function cachesRoute(req, res) {
         res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
       // One message per drive, carrying sized results. Nothing is reported
       // before its size is known — an unsized row is not actionable.
-      onFound: (found) =>
-        res.write(JSON.stringify({ type: "found", found, packs }) + "\n"),
+      onFound: (found) => {
+        offered.add(found.map((hit) => hit.path), "caches");
+        res.write(JSON.stringify({ type: "found", found, packs }) + "\n");
+      },
     });
 
     res.write(
@@ -221,6 +233,7 @@ async function scanRoute(req, res) {
   const matches = (name) => wanted.has(name.toLowerCase());
 
   const started = Date.now();
+  offered.clear("zap");
 
   let result;
   try {
@@ -237,6 +250,8 @@ async function scanRoute(req, res) {
     if (signal.aborted) return;
     throw err;
   }
+
+  offered.add(result.hits.map((hit) => hit.path), "zap");
 
   res.write(
     JSON.stringify({
@@ -322,7 +337,7 @@ async function planRoute(req, res) {
     return json(res, 400, { error: "paths must be a non-empty array" });
   }
 
-  const { allowed, refused } = screenPaths(paths);
+  const { allowed, refused } = buildPlan(paths, { offered, screen: screenPaths });
 
   // Confirm each path still exists, and nothing more. Totalling the bytes
   // again would re-walk every subtree — for a few hundred node_modules that

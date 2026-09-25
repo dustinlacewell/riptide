@@ -110,24 +110,7 @@ function withinScope(full, scope) {
 }
 
 /**
- * System folders whose whole subtree is off limits to packs. screenPaths
- * refuses these folders themselves; a pack hit is also refused anywhere
- * beneath them.
- *
- * Deliberately narrower than screenPaths' list. The drive root, Users,
- * Users\<name> and ProgramData are refused only as exact paths: nearly every
- * cache lives under a user profile, and several real ones live under
- * ProgramData (C:\ProgramData\Dbg, GOG's webcache, VS packages).
- */
-const SYSTEM_TREES = new Set([
-  "windows",
-  "program files",
-  "program files (x86)",
-  "$recycle.bin",
-  "system volume information",
-]);
-
-/**
+ * The protected-folder rules live in protect.js, through screenPaths.
  * Depth is waived for a named path: real stores do sit at a drive root
  * (D:\.pnpm-store). It is not waived for anything a wildcard produced.
  */
@@ -136,11 +119,6 @@ function screen(hits) {
   const refused = [];
 
   for (const hit of hits) {
-    if (insideSystemTree(hit.path)) {
-      refused.push({ path: hit.path, reason: "inside a protected system folder" });
-      continue;
-    }
-
     const result = screenPaths([hit.path], { requireDepth: hit.wild === true });
     if (result.refused.length > 0) {
       refused.push(...result.refused);
@@ -150,10 +128,4 @@ function screen(hits) {
   }
 
   return { hits: hitsOut, refused };
-}
-
-// Compares whole segments, so C:\Windowsold is not inside C:\Windows.
-function insideSystemTree(full) {
-  const top = full.slice(3).split("\\")[0].toLowerCase();
-  return SYSTEM_TREES.has(top);
 }

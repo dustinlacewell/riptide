@@ -11,20 +11,7 @@ import { spawn } from "node:child_process";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-/**
- * Paths we refuse to delete regardless of what the UI asked for. A pattern
- * typo should not be able to take out a drive root or a system directory.
- */
-const REFUSED = [
-  /^[A-Za-z]:\\?$/,
-  /^[A-Za-z]:\\Windows$/i,
-  /^[A-Za-z]:\\Program Files( \(x86\))?$/i,
-  /^[A-Za-z]:\\ProgramData$/i,
-  /^[A-Za-z]:\\Users$/i,
-  /^[A-Za-z]:\\Users\\[^\\]+$/i,
-  /^[A-Za-z]:\\\$Recycle\.Bin/i,
-  /^[A-Za-z]:\\System Volume Information/i,
-];
+import { protectionOf } from "./protect.js";
 
 /**
  * Check a set of paths before deleting anything.
@@ -46,9 +33,11 @@ export function screenPaths(paths, { requireDepth = true } = {}) {
   for (const raw of paths) {
     const full = path.resolve(raw);
 
-    const blocked = REFUSED.find((re) => re.test(full));
-    if (blocked) {
-      refused.push({ path: full, reason: "protected system path" });
+    // A pattern typo or a crafted request must not reach a drive root or a
+    // system folder, whatever the UI asked for.
+    const protection = protectionOf(full);
+    if (protection) {
+      refused.push({ path: full, reason: protection });
       continue;
     }
 
