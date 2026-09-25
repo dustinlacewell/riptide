@@ -26,6 +26,7 @@ import { fileExists, system32 } from "./spawn.js";
 
 const SHUTDOWN_TIMEOUT_MS = 2 * 60 * 1000;
 const COMPACT_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const DETACH_TIMEOUT_MS = 5 * 60 * 1000;
 const DOCKER_DEPTH = 4;
 const DISKPART_ERROR = /DiskPart has encountered an error|Virtual Disk Service error|DiskPart failed/i;
 
@@ -61,6 +62,15 @@ export default {
         label: `diskpart: compact ${disk}`,
         stdin: compactScript(disk),
         failPattern: DISKPART_ERROR,
+        // diskpart on stdin runs past an error, but a kill or a timeout
+        // stops it with the disk still attached.
+        cleanup: {
+          exe: diskpart,
+          args: [],
+          timeoutMs: DETACH_TIMEOUT_MS,
+          label: `diskpart: detach ${disk}`,
+          stdin: detachScript(disk),
+        },
       })),
     ];
   },
@@ -83,6 +93,19 @@ export function compactScript(disk) {
     "exit",
     "",
   ].join("\r\n");
+}
+
+/**
+ * The diskpart commands that detach one disk after a failed compact.
+ * "noerr" keeps a disk that was never attached from counting as an error.
+ *
+ * @param {string} disk
+ * @returns {string}
+ */
+export function detachScript(disk) {
+  const problem = diskPathProblem(disk);
+  if (problem) throw new Error(`refused disk path (${problem}): ${JSON.stringify(disk)}`);
+  return [`select vdisk file="${disk}"`, "detach vdisk noerr", "exit", ""].join("\r\n");
 }
 
 /**

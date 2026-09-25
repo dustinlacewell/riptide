@@ -8,6 +8,9 @@
  *   failPattern  an output line matching it fails the step whatever the
  *                exit code. diskpart reading stdin reports an error in its
  *                output and still exits 0.
+ *   cleanup      a step run after this one fails for any reason: error,
+ *                kill, timeout. It runs even after an abort. Its outcome
+ *                does not change the failure reported.
  *
  * Output arrives as lines. Exit code 0 is success; any other code, a spawn
  * error, a timeout or an abort is failure, and the steps after it do not
@@ -53,7 +56,10 @@ export async function runAction(action, ctx, { onLine = () => {}, signal } = {})
  */
 export async function runStep(step, { spawn, onLine = () => {}, signal }) {
   if (signal?.aborted) return { ok: false, error: "stopped" };
-  return spawnStep(step, { spawn, onLine, signal });
+  const result = await spawnStep(step, { spawn, onLine, signal });
+  // No signal: a cleanup is what an abort most needs.
+  if (!result.ok && step.cleanup) await spawnStep(step.cleanup, { spawn, onLine, signal: undefined });
+  return result;
 }
 
 /**

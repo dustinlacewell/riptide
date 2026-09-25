@@ -15,7 +15,14 @@ import { createFakeSpawn } from "./fakeSpawn.js";
 import pnpmStorePrune from "./pnpm-store-prune.js";
 import dockerBuilderPrune from "./docker-builder-prune.js";
 import dockerImagePrune from "./docker-image-prune.js";
-import wslCompact, { compactScript, diskPathProblem, findDisks, isSafeDiskPath } from "./wsl-compact.js";
+import wslCompact, {
+  compactScript,
+  detachScript,
+  diskPathProblem,
+  findDisks,
+  isSafeDiskPath,
+} from "./wsl-compact.js";
+import { runStep } from "./run.js";
 import windowsComponentCleanup from "./windows-component-cleanup.js";
 import { parseDockerSize } from "./docker.js";
 
@@ -205,6 +212,38 @@ test("wsl: shutdown first, then diskpart per disk, commands on stdin", async (t)
     assert.ok(step.failPattern.test("Virtual Disk Service error:"));
   }
   assert.deepEqual(disks.sort(), [distro, docker].sort());
+});
+
+test("wsl: a failed, killed or timed-out compact is followed by a detach", async (t) => {
+  const { env, sys } = await wslMachine(t);
+  const diskpart = path.join(sys, "System32", "diskpart.exe");
+  const steps = await wslCompact.steps({ env });
+  const compact = steps[1];
+  const disk = /select vdisk file="([^"]+)"/.exec(compact.stdin)[1];
+
+  // diskpart's own error line, exit 0.
+  const failing = createFakeSpawn((exe, args) => ({
+    stdout: exe === diskpart && args.length === 0 ? ["Virtual Disk Service error:\r\n"] : [],
+  }));
+  const failed = await runStep(compact, { spawn: failing.spawn });
+  assert.equal(failed.ok, false);
+  assert.equal(failing.calls.length, 2);
+  assert.equal(failing.calls[1].exe, diskpart);
+  assert.equal(failing.calls[1].stdin, `select vdisk file="${disk}"\r\ndetach vdisk noerr\r\nexit\r\n`);
+  assert.equal(failing.calls[1].stdin, detachScript(disk));
+
+  // A hang past the timeout: killed, then detached.
+  let spawned = 0;
+  const hanging = createFakeSpawn(() => (spawned++ === 0 ? { hang: true } : { code: 0 }));
+  const timed = await runStep({ ...compact, timeoutMs: 10 }, { spawn: hanging.spawn });
+  assert.match(timed.error, /timed out/);
+  assert.equal(hanging.calls[0].killed, true);
+  assert.equal(hanging.calls[1].stdin, detachScript(disk));
+
+  // Success: no detach.
+  const fine = createFakeSpawn();
+  assert.equal((await runStep(compact, { spawn: fine.spawn })).ok, true);
+  assert.equal(fine.calls.length, 1);
 });
 
 test("wsl: the stdin script is exactly the diskpart commands", () => {
