@@ -20,6 +20,10 @@ import { createOffered } from "./offered.js";
 import { buildPlan } from "./plan.js";
 import { runRipgrep } from "./grep/run.js";
 import { parseGlobs } from "./grep/args.js";
+import { driveOf } from "./caches/expand.js";
+import { createMapStore } from "./map/store.js";
+import { readMap } from "./map/read.js";
+import { childrenPage } from "./map/page.js";
 
 const BASE = "/__riptide";
 
@@ -35,6 +39,9 @@ const offered = createOffered();
  */
 const plans = new Map();
 const PLAN_TTL_MS = 10 * 60 * 1000;
+
+/** Space-map snapshots, one per drive, held between requests. */
+const maps = createMapStore();
 
 export default function riptide() {
   return {
@@ -77,6 +84,12 @@ async function route(req, res) {
   }
   if (req.method === "POST" && url.pathname === "/zap") {
     return zapRoute(req, res);
+  }
+  if (req.method === "POST" && url.pathname === "/map/read") {
+    return mapReadRoute(req, res);
+  }
+  if (req.method === "GET" && url.pathname === "/map/node") {
+    return mapNodeRoute(url, res);
   }
 
   json(res, 404, { error: "no such endpoint" });
@@ -415,6 +428,58 @@ async function zapRoute(req, res) {
     }) + "\n",
   );
   res.end();
+}
+
+/**
+ * Read a whole drive into a space-map snapshot. Streams the MFT progress
+ * notes, then "compact", then one done line naming the snapshot.
+ */
+async function mapReadRoute(req, res) {
+  const signal = abortOnDisconnect(res);
+
+  const { root } = await body(req);
+  if (signal.aborted) return;
+
+  const drive = typeof root === "string" ? driveOf(root.trim()) : null;
+  if (!drive) return json(res, 400, { error: "root must be a path on a drive" });
+
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson",
+    "Cache-Control": "no-cache",
+  });
+  const write = (note) => res.write(JSON.stringify(note) + "\n");
+
+  try {
+    const result = await readMap({
+      drive,
+      root: root.trim(),
+      store: maps,
+      signal,
+      onProgress: (note) => write({ type: "progress", ...note }),
+    });
+    write({ type: "done", ...result });
+  } catch (err) {
+    // The client stopped the run and is no longer listening.
+    if (signal.aborted) return;
+    // A newer read of the same drive replaced this one.
+    write({ type: "done", failure: err.name === "AbortError" ? "replaced by a newer read" : err.message });
+  }
+  res.end();
+}
+
+/** One page of a held snapshot. A stale generation is a 409. */
+function mapNodeRoute(url, res) {
+  const q = url.searchParams;
+  const { slot, stale } = maps.at(q.get("drive") ?? "", q.get("gen"));
+  if (stale) return json(res, 409, { error: "the map changed; reload it" });
+  if (!slot) return json(res, 404, { error: "no map for that drive" });
+
+  const page = childrenPage(slot.snap, Number(q.get("id") ?? 0), {
+    depth: Number(q.get("depth") ?? 2),
+    limit: Number(q.get("limit") ?? 40),
+  });
+  if (!page) return json(res, 404, { error: "no such folder" });
+  json(res, 200, { gen: slot.gen, ...page });
 }
 
 // ---------------------------------------------------------------------------
