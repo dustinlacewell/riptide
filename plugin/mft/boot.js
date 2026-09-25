@@ -13,7 +13,8 @@ const NTFS_OEM_ID = "NTFS    ";
  * @param {Buffer} buf at least 512 bytes read from offset 0 of the volume
  * @returns {{bytesPerSector: number, sectorsPerCluster: number,
  *            bytesPerCluster: number, mftCluster: bigint,
- *            bytesPerFileRecord: number, mftOffset: bigint}}
+ *            bytesPerFileRecord: number, mftOffset: bigint, serial: bigint}}
+ *   serial is the volume serial number; a format gives a new one
  */
 export function parseBootSector(buf) {
   if (buf.length < 512) {
@@ -48,6 +49,7 @@ export function parseBootSector(buf) {
       bytesPerCluster,
     ),
     mftOffset: mftCluster * BigInt(bytesPerCluster),
+    serial: buf.readBigUInt64LE(0x48),
   };
 }
 

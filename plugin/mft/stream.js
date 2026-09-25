@@ -7,7 +7,7 @@
  */
 
 import { applyFixup, parseFileRecord } from "./record.js";
-import { createMarks, markFile, queryIds } from "./filenames.js";
+import { addRecord, createTree } from "./fold.js";
 
 const READ_CHUNK = 8 * 1024 * 1024;
 
@@ -48,11 +48,12 @@ export function intervalGate(clock, everyMs) {
 /**
  * Read every MFT extent sequentially and parse the records within.
  *
- * Only directory records are retained. A volume with millions of files
- * cannot afford to hold a JS object per file — on this machine that came to
- * 1.3 GB of heap and killed the dev server. Files are folded into their
- * parent's running total as they stream past and then dropped, so peak
- * memory tracks the directory count rather than the file count.
+ * Only directory records are retained as objects. A volume with millions
+ * of files cannot afford a JS object per file — on this machine that came
+ * to 1.3 GB of heap and killed the dev server. Files are folded into their
+ * parent's running total as they stream past (fold.js); what each one
+ * added stays in typed arrays of about 18 bytes a record, so a later
+ * change can take it back out.
  *
  * Progress: {stage: "mft-stream", recordsDone, recordsTotal, bytesRead,
  * dirs, matches?} at most every 100 ms. matches counts directories whose
@@ -64,11 +65,8 @@ export function intervalGate(clock, everyMs) {
  *          query?: object|null, countMatch?: (name: string) => boolean,
  *          onProgress?: Function, signal?: AbortSignal,
  *          clock?: () => number}} opts
- * @returns {Promise<{dirs: Map<number, object>, ownBytes: Map<number, bigint>,
- *            ownFiles: Map<number, number>, ownLatest: Map<number, number>,
- *            marks: import("./filenames.js").Marks, recordsDone: number}>}
- *   ownLatest is the newest file modified time (Unix ms) directly in each
- *   directory; a directory with no dated files has no entry.
+ * @returns {Promise<ReturnType<typeof createTree> & {recordsDone: number}>}
+ *   the tree fold.js describes
  */
 export async function streamMftRecords({
   read,
@@ -82,11 +80,7 @@ export async function streamMftRecords({
 }) {
   const recordSize = boot.bytesPerFileRecord;
   const { recordsTotal } = recordsIn(ranges, recordSize);
-  const dirs = new Map();
-  const ownBytes = new Map();
-  const ownFiles = new Map();
-  const ownLatest = new Map();
-  const marks = createMarks(queryIds(query), recordsTotal);
+  const tree = createTree({ size: recordsTotal, query });
   const due = intervalGate(clock, EMIT_MS);
 
   let recordNumber = 0;
@@ -99,7 +93,7 @@ export async function streamMftRecords({
       recordsDone: recordNumber,
       recordsTotal,
       bytesRead,
-      dirs: dirs.size,
+      dirs: tree.dirs.size,
       ...(countMatch ? { matches } : {}),
     });
 
@@ -132,34 +126,13 @@ export async function streamMftRecords({
         const entry = parseFileRecord(rec, current);
         if (!entry) continue;
 
-        if (entry.isDirectory) {
-          dirs.set(current, entry);
-          if (countMatch?.(entry.name)) matches += 1;
-          continue;
-        }
-
-        // Fold into the parent's total, then let the record go.
-        ownBytes.set(entry.parent, (ownBytes.get(entry.parent) ?? 0n) + entry.size);
-        ownFiles.set(entry.parent, (ownFiles.get(entry.parent) ?? 0) + 1);
-        foldLatest(ownLatest, entry.parent, entry.mtime);
-
-        if (query) markFile(marks, query, entry.name, entry.parent);
+        addRecord(tree, current, entry);
+        if (entry.isDirectory && countMatch?.(entry.name)) matches += 1;
       }
 
       consumed += BigInt(usable > 0 ? usable : chunk.length);
     }
   }
 
-  return { dirs, ownBytes, ownFiles, ownLatest, marks, recordsDone: recordNumber };
-}
-
-/**
- * Keep the newest file modified time seen in a directory. Only files count:
- * a directory's own time moves whenever an entry is added or removed —
- * including by this tool's own deletes — so it says nothing about work.
- */
-function foldLatest(ownLatest, parent, mtime) {
-  if (mtime === null) return;
-  const held = ownLatest.get(parent);
-  if (held === undefined || mtime > held) ownLatest.set(parent, mtime);
+  return Object.assign(tree, { recordsDone: recordNumber });
 }

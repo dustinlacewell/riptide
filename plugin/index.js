@@ -22,6 +22,10 @@ import { runRipgrep } from "./grep/run.js";
 import { parseGlobs } from "./grep/args.js";
 import { driveOf } from "./caches/expand.js";
 import { createMapStore } from "./map/store.js";
+import { createKeep, KEEP_CHOICES } from "./keep.js";
+import { createTreeCache, readerOf } from "./mft/treeCache.js";
+import { buildNameQuery } from "./mft/filenames.js";
+import { standingNeeds } from "./caches/needs.js";
 import { readMap } from "./map/read.js";
 import { childrenPage } from "./map/page.js";
 import { identifyFolder } from "./map/identify.js";
@@ -49,8 +53,26 @@ const offered = createOffered();
 const plans = new Map();
 const PLAN_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * How many drives stay ready between requests. One limit for the volume
+ * trees and the space-map snapshots; the client sets it through /settings.
+ */
+const keep = createKeep();
+
+/** The last volume tree of each kept drive. */
+const trees = createTreeCache({ keep });
+
 /** Space-map snapshots, one per drive, held between requests. */
-const maps = createMapStore();
+const maps = createMapStore({ keep });
+
+/**
+ * A readTree that goes through the tree cache. Every read asks for the
+ * file names any loaded pack could need, so a tree kept for one tab serves
+ * the others too.
+ */
+function treeReader(allEntries, { full = false } = {}) {
+  return readerOf(trees, { query: buildNameQuery(standingNeeds(allEntries)), full });
+}
 
 /** Actions running now, across every /zap: one run of each at a time. */
 const runningActions = createRunLock();
@@ -117,6 +139,12 @@ async function route(req, res) {
   }
   if (req.method === "POST" && url.pathname === "/map/offer") {
     return mapOfferRoute(req, res);
+  }
+  if (req.method === "GET" && url.pathname === "/settings") {
+    return json(res, 200, settingsOf());
+  }
+  if (req.method === "POST" && url.pathname === "/settings") {
+    return settingsRoute(req, res);
   }
 
   json(res, 404, { error: "no such endpoint" });
@@ -219,6 +247,7 @@ async function cachesRoute(req, res) {
       signal,
       // With a root, only its drive is read and only hits under it are kept.
       root: typeof root === "string" && root.trim() ? root : null,
+      readTree: treeReader(all),
       onProgress: (note) =>
         res.write(JSON.stringify({ type: "progress", ...note }) + "\n"),
       // One message per drive, carrying sized results. Nothing is reported
@@ -291,11 +320,13 @@ async function scanRoute(req, res) {
 
   const started = Date.now();
   offered.clear("zap");
+  const { entries: packEntries } = await loadPacks();
 
   let result;
   try {
     result = await scanVolume({
       root,
+      readTree: treeReader(packEntries),
       matches,
       // The same test, counted live while the MFT streams.
       countMatch: matches,
@@ -537,6 +568,7 @@ async function mapReadRoute(req, res) {
       drive,
       root: root.trim(),
       store: maps,
+      readTree: treeReader(all),
       entries,
       patterns: normalizePatterns(patterns),
       drives,
@@ -592,6 +624,24 @@ async function mapOfferRoute(req, res) {
   offered.clear("map");
   offered.add(result.paths, "map");
   json(res, 200, result);
+}
+
+/**
+ * The server-side settings. keepDrives applies at once: drives past a
+ * lower limit are dropped now.
+ */
+async function settingsRoute(req, res) {
+  const { keepDrives } = await body(req);
+  if (!KEEP_CHOICES.includes(keepDrives)) {
+    return json(res, 400, { error: `keepDrives must be one of ${KEEP_CHOICES.join(", ")}` });
+  }
+  keep.setLimit(keepDrives);
+  json(res, 200, settingsOf());
+}
+
+/** bytesPerDrive is null until a drive has been read. */
+function settingsOf() {
+  return { keepDrives: keep.limit, bytesPerDrive: trees.bytesPerDrive() };
 }
 
 // ---------------------------------------------------------------------------

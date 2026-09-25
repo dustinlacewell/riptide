@@ -8,8 +8,8 @@
 
 /**
  * @param {number} [size] how many bits to reserve up front
- * @returns {{set: (i: number) => void, has: (i: number) => boolean,
- *            readonly bytes: number}}
+ * @returns {{set: (i: number) => void, clear: (i: number) => void,
+ *            has: (i: number) => boolean, readonly bytes: number}}
  */
 export function createBitset(size = 0) {
   let words = new Uint32Array(wordsFor(size));
@@ -25,6 +25,10 @@ export function createBitset(size = 0) {
       const w = i >>> 5;
       if (w >= words.length) grow(i);
       words[w] |= 1 << (i & 31);
+    },
+    clear(i) {
+      const w = i >>> 5;
+      if (w < words.length) words[w] &= ~(1 << (i & 31));
     },
     has(i) {
       const w = i >>> 5;

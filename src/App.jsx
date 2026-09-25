@@ -6,6 +6,8 @@ import CachePanel from "./CachePanel.jsx";
 import MapPanel from "./MapPanel.jsx";
 import { COLUMNS, DEFAULT_SORT } from "./sort.js";
 import { load, remember, save } from "./persist.js";
+import SettingsDialog from "./SettingsDialog.jsx";
+import Glyph from "./ui/Glyph.jsx";
 import WaveMark from "./ui/WaveMark.jsx";
 
 const TABS = {
@@ -44,6 +46,7 @@ const DEFAULTS = {
   caseMode: "smart",
   regex: true,
   disabledCaches: [],
+  keepDrives: 2,
 };
 
 const SORT_KEYS = Object.keys(COLUMNS);
@@ -65,6 +68,14 @@ export default function App() {
   const [roots, setRoots] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState({});
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // The server holds this setting only in memory, so every page load and
+  // every change sends it again.
+  const keepDrives = prefs.keepDrives;
+  useEffect(() => {
+    api.putSettings({ keepDrives }).catch((e) => setError(e.message));
+  }, [keepDrives]);
 
   useEffect(() => {
     api
@@ -135,7 +146,24 @@ export default function App() {
             </button>
           ))}
         </div>
+
+        <button
+          className="cog header-cog"
+          onClick={() => setSettingsOpen(true)}
+          title="Settings"
+          aria-label="Settings"
+        >
+          <Glyph name="cog" size={20} />
+        </button>
       </header>
+
+      {settingsOpen && (
+        <SettingsDialog
+          keepDrives={keepDrives}
+          onKeepDrives={(n) => onPrefsChange({ keepDrives: n })}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
 
       <main className="app">
         <p className="tab-about">{TABS[tab].about}</p>

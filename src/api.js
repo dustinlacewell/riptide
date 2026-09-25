@@ -151,6 +151,27 @@ export async function mapOffer({ drive, gen, recNos }) {
   return res.json();
 }
 
+/**
+ * Send the server-side settings; resolves with what the server now holds:
+ * {keepDrives, bytesPerDrive}. bytesPerDrive is null until a drive is read.
+ */
+export async function putSettings({ keepDrives }) {
+  const res = await fetch(`${BASE}/settings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keepDrives }),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  return res.json();
+}
+
+/** The server-side settings, as putSettings resolves them. */
+export async function getSettings() {
+  const res = await fetch(`${BASE}/settings`);
+  if (!res.ok) throw new Error(await errorText(res));
+  return res.json();
+}
+
 export function zap({ token, permanent, confirmCount, onProgress }) {
   return streamNdjson("/zap", { token, permanent, confirmCount }, onProgress);
 }

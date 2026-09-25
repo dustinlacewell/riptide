@@ -51,6 +51,17 @@ test("round-trips root, patterns and sort", () => {
   });
 });
 
+test("keeps a valid drive count and drops anything else", () => {
+  stubStorage({ initial: JSON.stringify({ keepDrives: 3 }) });
+  assert.equal(load({ ...DEFAULTS, keepDrives: 2 }, KEYS).keepDrives, 3);
+  stubStorage({ initial: JSON.stringify({ keepDrives: 0 }) });
+  assert.equal(load({ ...DEFAULTS, keepDrives: 2 }, KEYS).keepDrives, 0);
+  for (const bad of [4, -1, "2", 1.5, null]) {
+    stubStorage({ initial: JSON.stringify({ keepDrives: bad }) });
+    assert.equal(load({ ...DEFAULTS, keepDrives: 2 }, KEYS).keepDrives, 2);
+  }
+});
+
 test("falls back to defaults on malformed JSON", () => {
   stubStorage({ initial: "{not json" });
   assert.deepEqual(load(DEFAULTS, KEYS), DEFAULTS);

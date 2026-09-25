@@ -80,30 +80,67 @@ export function queryIds(query) {
 }
 
 /**
- * @typedef {{has: (dir: number, id: string) => boolean,
- *            set: (dir: number, id: string) => void}} Marks
+ * @typedef {{ids: string[],
+ *            has: (dir: number, id: string) => boolean,
+ *            count: (dir: number, id: string) => number,
+ *            set: (dir: number, id: string) => void,
+ *            unset: (dir: number, id: string) => void,
+ *            readonly bytes: number}} Marks
  */
 
 /**
- * Which directories hold a file matching each pattern: one bitset per
- * pattern id over directory record numbers. Memory is fixed by the record
- * count and the pattern count, not by how many folders match.
+ * How many files matching each pattern every directory holds.
+ *
+ * A mark is a count, not a flag, so a file leaving a folder can take its
+ * mark away without hiding a sibling that matches the same pattern. Most
+ * folders hold one match at most, so each pattern is a bitset (one or more)
+ * plus a Map for only the folders that hold two or more. Memory is about
+ * one bit per record per pattern; a 4.87M-record volume with 17 patterns
+ * costs about 10 MB, plus the rare multi-match folders.
  *
  * @param {string[]} ids pattern ids (see markId)
  * @param {number} [size] record count, to reserve the bits up front
  * @returns {Marks}
  */
 export function createMarks(ids, size = 0) {
-  const byId = new Map(ids.map((id) => [id, createBitset(size)]));
+  const byId = new Map(ids.map((id) => [id, { bits: createBitset(size), more: new Map() }]));
+  const tallyOf = (id) => {
+    const tally = byId.get(id);
+    if (!tally) throw new Error(`mark for unknown pattern "${id}"`);
+    return tally;
+  };
+
   return {
-    has: (dir, id) => byId.get(id)?.has(dir) ?? false,
+    ids,
+    has: (dir, id) => byId.get(id)?.bits.has(dir) ?? false,
+    count(dir, id) {
+      const tally = byId.get(id);
+      if (!tally?.bits.has(dir)) return 0;
+      return tally.more.get(dir) ?? 1;
+    },
     set(dir, id) {
-      const bits = byId.get(id);
-      if (!bits) throw new Error(`mark for unknown pattern "${id}"`);
-      bits.set(dir);
+      const { bits, more } = tallyOf(id);
+      if (!bits.has(dir)) bits.set(dir);
+      else more.set(dir, (more.get(dir) ?? 1) + 1);
+    },
+    unset(dir, id) {
+      const { bits, more } = tallyOf(id);
+      const held = more.get(dir);
+      if (held === undefined) bits.clear(dir);
+      else if (held > 2) more.set(dir, held - 1);
+      else more.delete(dir);
+    },
+    get bytes() {
+      let sum = 0;
+      for (const { bits, more } of byId.values()) sum += bits.bytes + more.size * MAP_ENTRY_BYTES;
+      return sum;
     },
   };
 }
+
+// A Map entry of two small integers, as V8 lays it out: key, value, chain
+// link and a share of the bucket table.
+const MAP_ENTRY_BYTES = 20;
 
 /**
  * Record a file's matches against its parent directory.
@@ -112,9 +149,12 @@ export function createMarks(ids, size = 0) {
  * @param {{exact: Set<string>, ext: Set<string>}} query
  * @param {string} name the file's name
  * @param {number} parent the file's parent record number
+ * @returns {string[]} the ids marked
  */
 export function markFile(marks, query, name, parent) {
-  for (const id of matchName(query, name)) marks.set(parent, id);
+  const ids = matchName(query, name);
+  for (const id of ids) marks.set(parent, id);
+  return ids;
 }
 
 /**

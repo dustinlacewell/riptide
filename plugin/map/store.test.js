@@ -8,6 +8,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { createKeep } from "../keep.js";
 import { createMapStore } from "./store.js";
 import { readMap } from "./read.js";
 import { buildSnapshot } from "./compact.js";
@@ -40,7 +41,7 @@ test("store: publish gives each snapshot a new generation", () => {
 });
 
 test("store: holds two drives and evicts the least recently used", () => {
-  const store = createMapStore({ max: 2 });
+  const store = createMapStore({ keep: createKeep({ limit: 2 }) });
   store.publish("C:", buildSnapshot(tree().tree));
   store.publish("D:", buildSnapshot(tree().tree));
   store.get("C:");
@@ -48,6 +49,15 @@ test("store: holds two drives and evicts the least recently used", () => {
   assert.ok(store.get("C:"));
   assert.equal(store.get("D:"), null);
   assert.ok(store.get("E:"));
+});
+
+test("store: at a keep limit of 0 the last snapshot still stays", () => {
+  const keep = createKeep({ limit: 0 });
+  const store = createMapStore({ keep });
+  store.publish("C:", buildSnapshot(tree().tree));
+  store.publish("D:", buildSnapshot(tree().tree));
+  assert.equal(store.get("C:"), null);
+  assert.ok(store.get("D:"));
 });
 
 test("store: a new read of a drive stops the running one", () => {

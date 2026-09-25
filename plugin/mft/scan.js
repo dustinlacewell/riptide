@@ -31,6 +31,7 @@ import { parseBootSector } from "./boot.js";
 import { runsToByteRanges } from "./runlist.js";
 import { applyFixup, extractMftRuns } from "./record.js";
 import { recordsIn, streamMftRecords } from "./stream.js";
+import { openVolume } from "./volume.js";
 import {
   resolvePath,
   subtreeSizes,
@@ -43,9 +44,11 @@ const now = () => performance.now();
  * @param {{root: string, matches: (name: string) => boolean,
  *          countMatch?: (name: string) => boolean,
  *          onProgress?: (n: {stage: string}) => void,
- *          signal?: AbortSignal, clock?: () => number}} opts
+ *          signal?: AbortSignal, clock?: () => number,
+ *          readTree?: typeof readVolumeTree}} opts
  *   countMatch, when given, makes the MFT stream report a running match
- *   count. It may be the same test as matches.
+ *   count. It may be the same test as matches. readTree defaults to a
+ *   fresh MFT read; the server passes its tree cache.
  * @returns {Promise<{strategy: "mft"|"walk", reason?: string,
  *                    hits: Array<{path: string, bytes: string, files: number,
  *                                 mtime: number|null}>,
@@ -60,9 +63,10 @@ export async function scanVolume({
   onProgress = () => {},
   signal,
   clock = now,
+  readTree = readVolumeTree,
 }) {
   const drive = driveLetterOf(root);
-  const opts = { root, matches, countMatch, onProgress, signal, clock };
+  const opts = { root, matches, countMatch, onProgress, signal, clock, readTree };
 
   if (drive) {
     try {
@@ -87,8 +91,8 @@ export async function scanVolume({
 // MFT strategy
 // ---------------------------------------------------------------------------
 
-async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal, clock }) {
-  const tree = await readVolumeTree(drive, { onProgress, signal, countMatch, clock });
+async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal, clock, readTree }) {
+  const tree = await readTree(drive, { onProgress, signal, countMatch, clock });
 
   const indexStart = clock();
   onProgress({ stage: "index" });
@@ -125,49 +129,71 @@ async function scanViaMft({ drive, root, matches, countMatch, onProgress, signal
  *          query?: {exact: Set<string>, ext: Set<string>}|null,
  *          countMatch?: (name: string) => boolean,
  *          signal?: AbortSignal, clock?: () => number}} [opts]
- * @returns {Promise<{dirs: Map, ownBytes: Map, ownFiles: Map, ownLatest: Map,
- *                    marks: import("./filenames.js").Marks, drive: string,
- *                    recordsDone: number, recordsTotal: number,
- *                    readMs: number}>}
+ * @returns {Promise<ReturnType<typeof readTreeFrom>>}
  */
-export async function readVolumeTree(
+export async function readVolumeTree(drive, opts = {}) {
+  opts.signal?.throwIfAborted();
+  const volume = await openVolume(drive);
+  try {
+    return await readTreeFrom(volume, drive, opts);
+  } finally {
+    await volume.close();
+  }
+}
+
+/**
+ * readVolumeTree on a volume already open.
+ *
+ * @param {{read: (offset: bigint, length: number) => Promise<Buffer>}} volume
+ * @param {string} drive
+ * @param {object} [opts] as readVolumeTree
+ * @returns {Promise<object>} the tree fold.js describes, plus drive,
+ *   recordsDone, recordsTotal, readMs, and the geometry a later update
+ *   needs: boot and mftRuns
+ */
+export async function readTreeFrom(
+  { read },
   drive,
   { onProgress = () => {}, query = null, countMatch = null, signal, clock = now } = {},
 ) {
   signal?.throwIfAborted();
   const started = clock();
-  const handle = await fsp.open(`\\\\.\\${drive}`, "r");
-  const read = (offset, length) => readAt(handle, offset, length);
 
-  try {
-    onProgress({ stage: "boot" });
-    const boot = parseBootSector(await read(0n, 512));
+  onProgress({ stage: "boot" });
+  const boot = parseBootSector(await read(0n, 512));
+  const mftRuns = await readMftRuns(read, boot);
+  const ranges = runsToByteRanges(mftRuns, boot.bytesPerCluster);
 
-    const zeroRecord = await read(boot.mftOffset, boot.bytesPerFileRecord);
-    applyFixup(zeroRecord, boot.bytesPerSector);
-    const ranges = runsToByteRanges(extractMftRuns(zeroRecord), boot.bytesPerCluster);
+  const { recordsTotal, mftBytes } = recordsIn(ranges, boot.bytesPerFileRecord);
+  onProgress({ stage: "mft-header", recordsTotal, mftBytes: Number(mftBytes) });
 
-    const { recordsTotal, mftBytes } = recordsIn(ranges, boot.bytesPerFileRecord);
-    onProgress({ stage: "mft-header", recordsTotal, mftBytes: Number(mftBytes) });
+  const tree = await streamMftRecords({
+    read,
+    ranges,
+    boot,
+    query,
+    countMatch,
+    onProgress,
+    signal,
+    clock,
+  });
 
-    const tree = await streamMftRecords({
-      read,
-      ranges,
-      boot,
-      query,
-      countMatch,
-      onProgress,
-      signal,
-      clock,
-    });
+  const readMs = clock() - started;
+  onProgress({ stage: "mft-done", recordsDone: tree.recordsDone, recordsTotal, readMs });
 
-    const readMs = clock() - started;
-    onProgress({ stage: "mft-done", recordsDone: tree.recordsDone, recordsTotal, readMs });
+  return Object.assign(tree, { drive, recordsTotal, readMs, boot, mftRuns });
+}
 
-    return { ...tree, drive, recordsTotal, readMs };
-  } finally {
-    await handle.close();
-  }
+/**
+ * Where the MFT lives: the run list of record 0's $DATA.
+ *
+ * @param {(offset: bigint, length: number) => Promise<Buffer>} read
+ * @param {ReturnType<typeof parseBootSector>} boot
+ */
+export async function readMftRuns(read, boot) {
+  const zeroRecord = await read(boot.mftOffset, boot.bytesPerFileRecord);
+  applyFixup(zeroRecord, boot.bytesPerSector);
+  return extractMftRuns(zeroRecord);
 }
 
 /** The outermost matching directories under root, with their full paths. */
@@ -346,12 +372,6 @@ async function sizeOf(file) {
 
 function bySizeDescending(a, b) {
   return Number(BigInt(b.bytes) - BigInt(a.bytes));
-}
-
-async function readAt(handle, offset, length) {
-  const buf = Buffer.allocUnsafe(length);
-  const { bytesRead } = await handle.read(buf, 0, length, Number(offset));
-  return buf.subarray(0, bytesRead);
 }
 
 function driveLetterOf(root) {

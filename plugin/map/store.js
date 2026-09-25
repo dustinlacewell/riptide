@@ -4,24 +4,27 @@
  * One slot per drive: {snap, gen, readAt, recordsTotal}. A slot changes only
  * when a read completes, so a stopped or failed read leaves the previous
  * snapshot in place. A new read of a drive stops the one still running on
- * it. At most `max` drives are held; the least recently used goes first.
- * Slots do not expire.
+ * it. How many drives are held is the shared keep limit (keep.js), with a
+ * floor of one: the map cannot show a page without its snapshot. The least
+ * recently used drive goes first. Slots do not expire.
  *
  * Every snapshot and every change to one gets a fresh generation number
  * from one counter. A client that asks with an old number gets told so,
  * rather than reading ids from a different snapshot.
  */
 
+import { createKeep, keyOf } from "../keep.js";
 import { applyChanges } from "./compact.js";
 import { idOfPath } from "./page.js";
 
 /**
- * @param {{max?: number, now?: () => number}} [opts]
+ * @param {{keep?: ReturnType<typeof createKeep>, now?: () => number}} [opts]
  */
-export function createMapStore({ max = 2, now = Date.now } = {}) {
+export function createMapStore({ keep = createKeep(), now = Date.now } = {}) {
   const slots = new Map();
   const running = new Map();
   let counter = 0;
+  keep.register({ floor: 1, holds: (drive) => slots.has(drive), evict: (drive) => slots.delete(drive) });
 
   /**
    * Start a read of a drive. Any read already running on it is stopped.
@@ -50,9 +53,8 @@ export function createMapStore({ max = 2, now = Date.now } = {}) {
     // `read` names the snapshot; `gen` also moves when a delete changes it.
     // Ids stay valid while `read` is the same.
     const slot = { drive: key, snap, gen: snap.gen, read: snap.gen, readAt: now(), recordsTotal };
-    slots.delete(key);
     slots.set(key, slot);
-    while (slots.size > max) slots.delete(slots.keys().next().value);
+    keep.touch(key);
     return slot;
   }
 
@@ -61,8 +63,7 @@ export function createMapStore({ max = 2, now = Date.now } = {}) {
     const key = keyOf(drive);
     const slot = slots.get(key);
     if (!slot) return null;
-    slots.delete(key);
-    slots.set(key, slot);
+    keep.touch(key);
     return slot;
   }
 
@@ -99,8 +100,4 @@ export function createMapStore({ max = 2, now = Date.now } = {}) {
   }
 
   return { begin, publish, get, at, removePaths };
-}
-
-function keyOf(drive) {
-  return String(drive).slice(0, 2).toUpperCase();
 }

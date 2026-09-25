@@ -69,8 +69,11 @@ export function applyFixup(rec, bytesPerSector) {
  * @param {Buffer} rec a single record, fixups already applied
  * @param {number} recordNumber this record's index in the MFT
  * @returns {null|{recordNumber: number, isDirectory: boolean, name: string,
- *                 parent: number, size: bigint, mtime: number|null}}
- *          mtime is the $STANDARD_INFORMATION modified time, Unix ms
+ *                 parent: number, size: bigint, mtime: number|null,
+ *                 seq: number}}
+ *          mtime is the $STANDARD_INFORMATION modified time, Unix ms.
+ *          seq is the header's sequence number: it moves each time the
+ *          record is reused, so (recordNumber, seq) names one file.
  *          null when the record is unused or not a real entry
  */
 export function parseFileRecord(rec, recordNumber) {
@@ -141,7 +144,7 @@ export function parseFileRecord(rec, recordNumber) {
 
   if (name === null || parent === null) return null;
 
-  return { recordNumber, isDirectory, name, parent, size, mtime };
+  return { recordNumber, isDirectory, name, parent, size, mtime, seq: rec.readUInt16LE(0x10) };
 }
 
 /**

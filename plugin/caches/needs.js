@@ -39,3 +39,15 @@ export function collectNeeds(entries) {
 export function projectNeeds(entries) {
   return entries.some((e) => e.perProject) ? PROJECT_MARKERS : [];
 }
+
+/**
+ * Every file pattern any loaded entry could ask for, enabled or not, and
+ * the project markers. A tree kept between requests is read with these,
+ * so turning an entry on never forces the MFT to be read again.
+ *
+ * @param {Array<{match: Array<{key: string, spec: object}>}>} entries all loaded
+ * @returns {string[]}
+ */
+export function standingNeeds(entries) {
+  return [...new Set([...collectNeeds(entries), ...PROJECT_MARKERS.map((p) => p.toLowerCase())])];
+}

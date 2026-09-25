@@ -12,6 +12,9 @@ const KEY = "riptide.prefs.v1";
 /** Tabs a stored preference may name. An unknown one falls back to default. */
 const TABS = ["zap", "search", "caches"];
 
+/** How many drives the server may keep ready: the settings' choices. */
+export const KEEP_CHOICES = [0, 1, 2, 3];
+
 /** How many recently-picked roots to keep. Enough to cover a day's work. */
 export const RECENT_LIMIT = 8;
 
@@ -73,6 +76,9 @@ function coerce(stored, defaults, sortKeys) {
     prefs.caseMode = stored.caseMode;
   }
   if (typeof stored.regex === "boolean") prefs.regex = stored.regex;
+
+  // Drives the server keeps ready for fast rescans.
+  if (KEEP_CHOICES.includes(stored.keepDrives)) prefs.keepDrives = stored.keepDrives;
 
   // A stored list is whatever an older build wrote: take the strings, drop
   // the rest, and cap it so a corrupted entry cannot grow without bound.
