@@ -87,7 +87,8 @@ test("usn: page padding and zero gaps are skipped", () => {
     100 * 8,
   );
   assert.ok(laid.end > laid.start + JOURNAL_PAGE, "spans a page, so a page tail is padding");
-  const { changes } = parseUsnRecords(laid.bytes, laid.start);
+  const { changes, hole } = parseUsnRecords(laid.bytes.subarray(800), 800);
+  assert.equal(hole, null);
   assert.equal(changes.length, 80);
   assert.deepEqual(changes.map((c) => c.usn), laid.usns);
 });
@@ -281,11 +282,34 @@ test("journal: changes from a USN on, across both halves of $J", async () => {
   const info = await readJournalInfo({ read: volume.read, boot, mftRuns, record: 40 });
 
   const all = await readChanges({ read: volume.read, boot, info, from: info.lowestValidUsn });
-  assert.deepEqual(all.map((c) => c.frn), specs.map((s) => s.frn));
+  assert.deepEqual(all.changes.map((c) => c.frn), specs.map((s) => s.frn));
+  assert.equal(all.end, info.nextUsn);
 
   const later = await readChanges({ read: volume.read, boot, info, from: usns[300] });
-  assert.deepEqual(later.map((c) => c.frn), specs.slice(300).map((s) => s.frn));
-  assert.deepEqual(await readChanges({ read: volume.read, boot, info, from: info.nextUsn }), []);
+  assert.deepEqual(later.changes.map((c) => c.frn), specs.slice(300).map((s) => s.frn));
+  assert.deepEqual(await readChanges({ read: volume.read, boot, info, from: info.nextUsn }), {
+    changes: [],
+    end: info.nextUsn,
+  });
+});
+
+test("journal: an unflushed zero page stops the read at its start", async () => {
+  const volume = buildVolume({ records: BASE });
+  const specs = Array.from({ length: 600 }, (_, i) => ({ frn: 1000 + i, time: 1_000_000 + i * 1000 }));
+  const { usns } = installJournal(volume, { changes: specs });
+  const { boot, mftRuns } = await geometry(volume);
+  const info = await readJournalInfo({ read: volume.read, boot, mftRuns, record: 40 });
+
+  // The fourth page of data (cluster 103 holds stream VCN 5): not yet flushed.
+  volume.buf.fill(0, 103 * CLUSTER, 104 * CLUSTER);
+  const hole = 5 * JOURNAL_PAGE;
+  const { changes, end } = await readChanges({ read: volume.read, boot, info, from: usns[0] });
+  assert.equal(end, hole, "the next read starts at the unflushed page");
+  assert.deepEqual(
+    changes.map((c) => c.frn),
+    specs.filter((_, i) => usns[i] < hole).map((s) => s.frn),
+    "nothing past the hole is taken",
+  );
 });
 
 test("journal: findUsnAt lands at or before the first change after a time", async () => {

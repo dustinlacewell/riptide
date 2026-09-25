@@ -57,11 +57,14 @@ export async function readJournalInfo({ read, boot, mftRuns, record, signal }) {
 }
 
 /**
- * The change records in [from, info.nextUsn).
+ * The change records in [from, info.nextUsn), up to the first page NTFS
+ * has not flushed yet.
  *
  * @param {{read: Function, boot: object, info: JournalInfo, from: number,
  *          signal?: AbortSignal}} opts
- * @returns {Promise<import("./usn.js").Change[]>}
+ * @returns {Promise<{changes: import("./usn.js").Change[], end: number}>}
+ *   end is where the next read must start: info.nextUsn, or the start of
+ *   an unflushed page, so that page is read again once it is written
  */
 export async function readChanges({ read, boot, info, from, signal }) {
   const changes = [];
@@ -74,11 +77,12 @@ export async function readChanges({ read, boot, info, from, signal }) {
     const buf = joined ? Buffer.concat([carry.bytes, bytes]) : bytes;
     const base = joined ? carry.usn : piece.start;
 
-    const { changes: found, rest } = parseUsnRecords(buf, base);
+    const { changes: found, rest, hole } = parseUsnRecords(buf, base);
     changes.push(...found);
+    if (hole !== null) return { changes, end: hole };
     carry = { usn: base + rest, bytes: Buffer.from(buf.subarray(rest)) };
   }
-  return changes;
+  return { changes, end: info.nextUsn };
 }
 
 /**

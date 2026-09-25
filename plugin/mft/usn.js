@@ -25,6 +25,8 @@ import { filetimeToMs } from "./record.js";
 
 const MIN_RECORD = 0x3c;
 const ALIGN = 8;
+// Records never cross a journal page; each page's tail is zero.
+const PAGE = 4096;
 
 /**
  * @param {Buffer} buf at least 32 bytes of $Max
@@ -50,15 +52,20 @@ export function parseMax(buf) {
  *
  * @param {Buffer} buf
  * @param {number} baseUsn the USN of buf[0]
- * @returns {{changes: Change[], rest: number}} rest is the offset of a
- *   record cut off by the end of buf, or buf.length; a caller reading on
- *   carries buf[rest..] into the next slice
+ * @returns {{changes: Change[], rest: number, hole: number|null}} rest is
+ *   the offset of a record cut off by the end of buf, or buf.length; a
+ *   caller reading on carries buf[rest..] into the next slice. hole is the
+ *   USN of a page that starts with zeros: NTFS has not flushed it yet, so
+ *   nothing at or after it can be read now. Parsing stops there.
  */
 export function parseUsnRecords(buf, baseUsn) {
   const changes = [];
   let pos = 0;
 
   while (pos + MIN_RECORD <= buf.length) {
+    if ((baseUsn + pos) % PAGE === 0 && buf.readUInt32LE(pos) === 0) {
+      return { changes, rest: pos, hole: baseUsn + pos };
+    }
     const length = buf.readUInt32LE(pos);
     const major = buf.readUInt16LE(pos + 4);
     const plausible = length >= MIN_RECORD && length % ALIGN === 0 && usnOffsetOf(major) !== null;
@@ -74,7 +81,7 @@ export function parseUsnRecords(buf, baseUsn) {
     pos += ALIGN;
   }
 
-  return { changes, rest: Math.min(pos, buf.length) };
+  return { changes, rest: Math.min(pos, buf.length), hole: null };
 }
 
 // ---------------------------------------------------------------------------

@@ -140,7 +140,8 @@ export function createTreeCache({
     const { dirtyDirs } = applyChanges(kept, plan.numbers, plan.entries);
     kept.mftRuns = plan.mftRuns;
     kept.recordsTotal = Math.max(kept.recordsTotal ?? 0, plan.recordsTotal);
-    kept.journal = { id: plan.info.id, nextUsn: plan.info.nextUsn };
+    // Up to an unflushed page, if one stopped the read; it is read next time.
+    kept.journal = { id: plan.info.id, nextUsn: plan.end };
     kept.recent = plan.recent;
     kept.version = (kept.version ?? 0) + 1;
     keep.touch(key);
@@ -159,14 +160,14 @@ export function createTreeCache({
     const reason = staleReason(kept, { serial: boot.serial, info });
     if (reason) return { reason };
 
-    const changes = await readChanges({ read, boot, info, from: kept.journal.nextUsn, signal });
+    const { changes, end } = await readChanges({ read, boot, info, from: kept.journal.nextUsn, signal });
     const { numbers, recent } = changedRecords(changes, { recent: kept.recent, now: wallClock() });
     if (numbers.size > MAX_CHANGES) return { reason: `more than ${MAX_CHANGES.toLocaleString()} records changed` };
 
     const { entries, torn } = await readEntries({ read, boot, mftRuns, numbers, signal });
     const { recordsTotal } = recordsIn(runsToByteRanges(mftRuns, boot.bytesPerCluster), boot.bytesPerFileRecord);
     // A torn record is read again next time rather than guessed at now.
-    return { reason: null, info, mftRuns, numbers, entries, recent: [...recent, ...torn], recordsTotal };
+    return { reason: null, info, end, mftRuns, numbers, entries, recent: [...recent, ...torn], recordsTotal };
   }
 
   async function readFull(key, { query = null, signal, onProgress, countMatch } = {}) {
