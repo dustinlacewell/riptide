@@ -51,6 +51,41 @@ test("plan: junk entries are refused, not thrown", () => {
   assert.equal(refused.length, 3);
 });
 
+test("plan: a cache at a drive root passes; the same path from zap does not", () => {
+  const offered = createOffered();
+  offered.add(["D:\\.pnpm-store"], "caches");
+  offered.add(["D:\\node_modules"], "zap");
+  offered.add(["D:\\stuff"], "map");
+  const { allowed, refused } = buildPlan(
+    ["D:\\.pnpm-store", "D:\\node_modules", "D:\\stuff"],
+    { offered, screen: screenPaths },
+  );
+  assert.deepEqual(allowed, ["D:\\.pnpm-store"]);
+  assert.deepEqual(
+    refused.map((r) => r.reason),
+    ["too close to drive root", "too close to drive root"],
+  );
+});
+
+test("plan: a cache offer still cannot reach a protected path", () => {
+  const offered = createOffered();
+  offered.add(["C:\\Windows\\Temp", "C:\\", "C:\\Users\\dustin"], "caches");
+  const { allowed, refused } = buildPlan(
+    ["C:\\Windows\\Temp", "C:\\", "C:\\Users\\dustin"],
+    { offered, screen: screenPaths },
+  );
+  assert.deepEqual(allowed, []);
+  assert.equal(refused.length, 3);
+});
+
+test("plan: a path offered by both zap and caches gets the cache waiver", () => {
+  const offered = createOffered();
+  offered.add(["D:\\.cache"], "zap");
+  offered.add(["D:\\.cache"], "caches");
+  const { allowed } = buildPlan(["D:\\.cache"], { offered, screen: screenPaths });
+  assert.deepEqual(allowed, ["D:\\.cache"]);
+});
+
 test("plan: a mixed batch partitions", () => {
   const deps = setup(["C:\\Users\\dustin\\a\\node_modules", "C:\\Windows\\Temp"]);
   const { allowed, refused } = buildPlan(

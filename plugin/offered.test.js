@@ -43,6 +43,18 @@ test("offered: clear drops one source and keeps the other", () => {
   assert.equal(offered.has("C:\\x\\both"), true, "still offered by caches");
 });
 
+test("offered: sourcesOf lists the live sources of a path", () => {
+  let t = 0;
+  const offered = createOffered({ now: () => t, ttlMs: 100 });
+  offered.add(["C:\\x\\a"], "zap");
+  t = 50;
+  offered.add(["C:\\x\\a"], "caches");
+  assert.deepEqual(offered.sourcesOf("c:/x/a").sort(), ["caches", "zap"]);
+  t = 120;
+  assert.deepEqual(offered.sourcesOf("C:\\x\\a"), ["caches"]);
+  assert.deepEqual(offered.sourcesOf("C:\\x\\none"), []);
+});
+
 test("offered: entries expire after the ttl", () => {
   let t = 1000;
   const offered = createOffered({ now: () => t, ttlMs: 60 * 60 * 1000 });

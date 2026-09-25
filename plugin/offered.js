@@ -17,6 +17,7 @@ const TTL_MS = 60 * 60 * 1000;
  * @param {{now?: () => number, ttlMs?: number}} opts
  * @returns {{add: (paths: string[], source: string) => void,
  *            has: (path: string) => boolean,
+ *            sourcesOf: (path: string) => string[],
  *            clear: (source: string) => void}}
  */
 export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
@@ -33,15 +34,22 @@ export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
   }
 
   function has(p) {
-    const sources = entries.get(pathKey(p));
-    if (!sources) return false;
+    return sourcesOf(p).length > 0;
+  }
+
+  // The sources that still offer a path. Expired entries are dropped.
+  function sourcesOf(p) {
+    const key = pathKey(p);
+    const sources = entries.get(key);
+    if (!sources) return [];
     const t = now();
+    const live = [];
     for (const [source, expires] of sources) {
-      if (expires > t) return true;
-      sources.delete(source);
+      if (expires > t) live.push(source);
+      else sources.delete(source);
     }
-    entries.delete(pathKey(p));
-    return false;
+    if (sources.size === 0) entries.delete(key);
+    return live;
   }
 
   function clear(source) {
@@ -51,5 +59,5 @@ export function createOffered({ now = Date.now, ttlMs = TTL_MS } = {}) {
     }
   }
 
-  return { add, has, clear };
+  return { add, has, sourcesOf, clear };
 }
