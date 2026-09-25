@@ -16,6 +16,10 @@
   /* Meaning */
   --current: #3dd6f5;
   --current-wash: rgba(61, 214, 245, 0.12);
+  --current-glow: rgba(61, 214, 245, 0.5);
+  --still: #3a5563;
+  --streak: rgba(11, 17, 23, 0.3);
+  --hatch: rgba(11, 17, 23, 0.4);
   --safe: #4ade80;
   --safe-wash: rgba(74, 222, 128, 0.12);
   --caution: #f5b83d;
@@ -75,6 +79,10 @@
     --scrim: rgba(13, 27, 36, 0.45);
     --current: #0891b2;
     --current-wash: rgba(8, 145, 178, 0.12);
+    --current-glow: rgba(8, 145, 178, 0.4);
+    --still: #9fb3c0;
+    --streak: rgba(255, 255, 255, 0.3);
+    --hatch: rgba(255, 255, 255, 0.4);
     --safe: #15803d;
     --safe-wash: rgba(21, 128, 61, 0.12);
     --caution: #b45309;

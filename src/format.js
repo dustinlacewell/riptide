@@ -10,6 +10,29 @@ export function bytes(value) {
   return `${n < 10 && unit > 0 ? n.toFixed(1) : Math.round(n)} ${UNITS[unit]}`;
 }
 
+/** Elapsed time as mm:ss.t — 16 700 ms is "00:16.7". */
+export function clockTime(ms) {
+  const tenths = Math.max(0, Math.floor(ms / 100));
+  const minutes = Math.floor(tenths / 600);
+  const seconds = (tenths % 600) / 10;
+  return `${String(minutes).padStart(2, "0")}:${seconds.toFixed(1).padStart(4, "0")}`;
+}
+
+/** A per-second rate, short: "840/s", "9.8k/s", "187k/s", "1.2M/s". */
+export function perSecond(rate) {
+  const r = Math.max(0, rate);
+  if (r < 1000) return `${Math.round(r)}/s`;
+  if (r < 1e6) return `${(r / 1000).toFixed(r < 1e4 ? 1 : 0)}k/s`;
+  return `${(r / 1e6).toFixed(1)}M/s`;
+}
+
+/** A count, short: "812", "41.2k", "4.87M". */
+export function compactCount(n) {
+  if (n < 1000) return String(n);
+  if (n < 1e6) return `${(n / 1000).toFixed(n < 1e4 ? 2 : n < 1e5 ? 1 : 0)}k`;
+  return `${(n / 1e6).toFixed(2)}M`;
+}
+
 export function sumBytes(values) {
   return values.reduce((total, v) => total + BigInt(v), 0n).toString();
 }

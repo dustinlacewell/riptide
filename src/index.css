@@ -553,6 +553,85 @@ button.danger:disabled {
   color: var(--dim);
 }
 
+/* --- scan telemetry ------------------------------------------------------ */
+
+.telemetry {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-4) var(--s-5) var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.telemetry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 20px;
+}
+
+.telemetry-title {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.telemetry-receipt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+}
+
+.telemetry-receipt .glyph {
+  color: var(--done);
+}
+
+/* The body folds away once the scan is done: the bar gets the length of
+   one surge to flash full, then the row collapses to the receipt. */
+.telemetry-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--t-base) var(--ease-out) var(--t-surge);
+}
+
+.telemetry.done .telemetry-fold {
+  grid-template-rows: 0fr;
+}
+
+/* Reaches into the panel's side padding so the bar's glow is not cut off
+   at the clip edge. */
+.telemetry-fold > .telemetry-inner {
+  min-height: 0;
+  margin: 0 calc(-1 * var(--s-5));
+  padding: 0 var(--s-5);
+  overflow: hidden;
+}
+
+.telemetry-inner > * {
+  margin-top: var(--s-4);
+}
+
+.telemetry-stats {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap: var(--s-5);
+}
+
+.telemetry.slow .stat-value {
+  color: var(--dim);
+}
+
+.telemetry-hint {
+  margin: var(--s-3) 0 0;
+  font-size: var(--fs-body);
+}
+
 /* --- status -------------------------------------------------------------- */
 
 .status,

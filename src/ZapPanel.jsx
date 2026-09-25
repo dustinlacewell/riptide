@@ -5,6 +5,8 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import RootField from "./RootField.jsx";
+import ScanTelemetry from "./ScanTelemetry.jsx";
+import { useScanStream } from "./useScanStream.js";
 import Callout from "./ui/Callout.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
 import { riskOf } from "./risk.js";
@@ -30,8 +32,8 @@ export default function ZapPanel({
   const [patterns, setPatterns] = useState(prefs.patterns ?? "node_modules");
 
   const [scanning, setScanning] = useState(false);
-  const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
+  const telemetry = useScanStream();
 
   const [spared, setSpared] = useState(() => new Set());
   const [sort, setSort] = useState(prefs.sort ?? DEFAULT_SORT);
@@ -79,22 +81,21 @@ export default function ZapPanel({
     setResult(null);
     flow.setOutcome(null);
     setSpared(new Set());
-    setProgress({ stage: "starting" });
+    telemetry.start();
 
     try {
-      setResult(
-        await api.scan({
-          root,
-          patterns,
-          signal,
-          onProgress: (n) => setProgress(n),
-        }),
-      );
+      const found = await api.scan({ root, patterns, signal, onProgress: telemetry.note });
+      telemetry.finish({
+        strategy: found.strategy,
+        stats: found.stats,
+        elapsedMs: found.elapsedMs,
+      });
+      setResult(found);
     } catch (e) {
+      telemetry.reset();
       if (!run.settle(e, signal)) flow.setError(e.message);
     } finally {
       setScanning(false);
-      setProgress(null);
     }
   }
 
@@ -147,13 +148,11 @@ export default function ZapPanel({
 
       {run.stopped && !scanning && <Callout tone="info">Stopped.</Callout>}
 
-      {progress && (
-        <p className="status">
-          {progress.stage}
-          {progress.recordsDone ? ` — ${progress.recordsDone.toLocaleString()}` : ""}
-          {progress.reason ? ` (${progress.reason})` : ""}
-        </p>
-      )}
+      <ScanTelemetry
+        scan={telemetry.state}
+        elapsedMs={telemetry.elapsedMs}
+        drive={driveOf(root)}
+      />
 
       {flow.error && <p className="error">{flow.error}</p>}
 
@@ -171,21 +170,7 @@ export default function ZapPanel({
             <span>
               <strong>{bytes(selectedBytes)}</strong> to reclaim
             </span>
-            <span className="strategy">
-              {result.strategy === "mft" ? "MFT scan" : "directory walk"}
-              {" · "}
-              {(result.elapsedMs / 1000).toFixed(1)}s
-            </span>
           </div>
-
-          {result.strategy === "walk" && (
-            <Callout tone="info">
-              Directory walk
-              {/EPERM|EACCES/.test(result.reason ?? "")
-                ? " — the MFT scan needs an elevated shell. Run the dev server as administrator for a much faster scan."
-                : `: ${result.reason}`}
-            </Callout>
-          )}
 
           {hits.length > 0 && (
             <>
@@ -259,4 +244,9 @@ export default function ZapPanel({
       )}
     </>
   );
+}
+
+/** "D:" from "d:\code", for the telemetry title; null for a UNC root. */
+function driveOf(root) {
+  return /^[A-Za-z]:/.exec(root ?? "")?.[0].toUpperCase() ?? null;
 }

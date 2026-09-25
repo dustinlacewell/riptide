@@ -66,6 +66,175 @@
   color: var(--dim);
 }
 
+/* --- Meter --------------------------------------------------------------- */
+
+.meter {
+  display: flex;
+  height: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.meter-thick {
+  height: 14px;
+}
+
+.meter-seg {
+  height: 100%;
+  transition: width var(--t-quick) linear;
+}
+
+.meter-seg:only-child {
+  border-radius: var(--r-pill);
+}
+
+.meter-current {
+  background-color: var(--current);
+}
+
+.meter-still {
+  background-color: var(--still);
+}
+
+.meter-safe {
+  background-color: var(--safe);
+}
+
+.meter-caution {
+  background-color: var(--caution);
+  background-image: repeating-linear-gradient(
+    120deg,
+    transparent 0 4px,
+    var(--hatch) 4px 6px
+  );
+}
+
+/* Streaks drifting through the fill: work is moving. */
+.meter-flow {
+  background-image: repeating-linear-gradient(
+    120deg,
+    transparent 0 10px,
+    var(--streak) 10px 16px
+  );
+  animation: meter-drift 700ms linear infinite;
+}
+
+.meter-glow {
+  animation: meter-glow var(--t-surge) var(--ease-out);
+}
+
+@keyframes meter-drift {
+  to {
+    background-position: 18.48px 0;
+  }
+}
+
+@keyframes meter-glow {
+  35% {
+    box-shadow: 0 0 24px 4px var(--current-glow);
+  }
+}
+
+/* --- Stat ---------------------------------------------------------------- */
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.stat-label {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stat-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat-value {
+  font-size: var(--fs-stat);
+  font-weight: 600;
+}
+
+.stat-dim {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.stat-hint {
+  color: var(--dim);
+  font-size: var(--fs-title);
+}
+
+/* --- PhaseDots ----------------------------------------------------------- */
+
+.phase-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  color: var(--dim);
+}
+
+.phase {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+}
+
+.phase.past .phase-dot,
+.phase.still .phase-dot {
+  background: var(--dim);
+}
+
+.phase.on .phase-dot {
+  background: var(--current);
+  animation: phase-pulse 900ms ease-in-out infinite;
+}
+
+.phase.on .phase-label,
+.phase.still .phase-label {
+  color: var(--text);
+}
+
+@keyframes phase-pulse {
+  50% {
+    transform: scale(1.6);
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-flow,
+  .meter-glow,
+  .phase.on .phase-dot {
+    animation: none;
+  }
+}
+
 /* --- Dialog -------------------------------------------------------------- */
 
 .backdrop {

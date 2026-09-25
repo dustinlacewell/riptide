@@ -7,6 +7,8 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 import ZapStatus from "./ZapStatus.jsx";
 import CacheSettings from "./CacheSettings.jsx";
 import RootField from "./RootField.jsx";
+import ScanTelemetry from "./ScanTelemetry.jsx";
+import { useScanStream } from "./useScanStream.js";
 import Callout from "./ui/Callout.jsx";
 import Glyph from "./ui/Glyph.jsx";
 import SortHeader from "./ui/SortHeader.jsx";
@@ -49,7 +51,7 @@ export default function CachePanel({
   const [problems, setProblems] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(null);
+  const telemetry = useScanStream();
   const [spared, setSpared] = useState(() => new Set());
   // Which rules are showing their instances. Local and deliberately not
   // persisted: a new scan starts collapsed.
@@ -81,7 +83,7 @@ export default function CachePanel({
     flow.setError(null);
     flow.setOutcome(null);
     setSummary(null);
-    setProgress({ stage: "starting" });
+    telemetry.start();
 
     setArrived([]);
 
@@ -102,20 +104,25 @@ export default function CachePanel({
           return;
         }
 
-        setProgress(note);
+        telemetry.note(note);
       }, signal);
 
       setProblems(done.errors ?? []);
       setSummary(done);
-      if (done.failure) flow.setError(done.failure);
+      if (done.failure) {
+        telemetry.reset();
+        flow.setError(done.failure);
+      } else {
+        telemetry.finish({ strategy: "mft", elapsedMs: done.elapsedMs });
+      }
     } catch (e) {
       // A stop keeps the drives that already reported.
+      telemetry.reset();
       if (!run.settle(e, signal)) flow.setError(e.message);
     } finally {
       setLoading(false);
-      setProgress(null);
     }
-  }, [flow, run, disabled, root]);
+  }, [flow, run, telemetry, disabled, root]);
 
   // Grouping and sorting happen at render, not on arrival, so re-sorting
   // never has to wait for another scan.
@@ -226,20 +233,7 @@ export default function CachePanel({
         </Callout>
       )}
 
-      {progress && (
-        <p className="status">
-          {progress.drive
-            ? `Reading ${progress.drive} MFT${
-                progress.driveCount > 1
-                  ? ` (${progress.driveIndex} of ${progress.driveCount})`
-                  : ""
-              }`
-            : progress.stage}
-          {progress.recordsDone
-            ? ` — ${progress.recordsDone.toLocaleString()} records`
-            : ""}
-        </p>
-      )}
+      <ScanTelemetry scan={telemetry.state} elapsedMs={telemetry.elapsedMs} />
 
       {flow.error && <p className="error">{flow.error}</p>}
 
