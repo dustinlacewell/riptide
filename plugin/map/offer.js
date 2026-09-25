@@ -8,8 +8,12 @@
  *   screen    protected paths, system subtrees and the depth rule — the map
  *             never waives depth: any folder on the drive can be picked, so
  *             nothing vouches for one at the drive root
+ *   identify  the folder on disk must still be the one the map read: a
+ *             folder renamed or recreated since keeps the path, not the
+ *             record number
  *
- * Pure: reads the snapshot, changes nothing.
+ * Reads the snapshot, changes nothing. Disk access is the injected
+ * identify (identify.js).
  */
 
 import { screenPaths } from "../zap.js";
@@ -19,14 +23,16 @@ import { pathOf } from "./page.js";
 /**
  * @param {object} snap
  * @param {unknown[]} recNos as the client sent them
- * @returns {{paths: string[], items: Array<{path: string, bytes: string, recNo: number}>,
- *            bytes: string, refused: Array<{path: string, reason: string}>}}
+ * @param {{identify: (path: string) => Promise<{isDir: boolean, recNo: number}|null>}} io
+ * @returns {Promise<{paths: string[], items: Array<{path: string, bytes: string, recNo: number}>,
+ *            bytes: string, refused: Array<{path: string, reason: string}>}>}
  */
-export function offerPicks(snap, recNos) {
+export async function offerPicks(snap, recNos, { identify }) {
   const refused = [];
   const ids = resolve(snap, recNos, refused);
   const outer = dropNested(snap, ids);
-  return screen(snap, outer, refused);
+  const screened = screen(snap, outer, refused);
+  return confirmIdentity(screened, identify);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,19 +86,28 @@ function dropNested(snap, ids) {
 function screen(snap, ids, refused) {
   const byPath = new Map(ids.map((id) => [pathOf(snap, id), id]));
   const screened = screenPaths([...byPath.keys()]);
-  const items = [];
-  let total = 0;
-
-  for (const full of screened.allowed) {
+  const items = screened.allowed.map((full) => {
     const id = byPath.get(full);
-    items.push({ path: full, bytes: String(snap.bytes[id]), recNo: snap.recNo[id] });
-    total += snap.bytes[id];
-  }
+    return { path: full, bytes: String(snap.bytes[id]), recNo: snap.recNo[id] };
+  });
 
-  return {
-    paths: items.map((i) => i.path),
-    items,
-    bytes: String(total),
-    refused: [...refused, ...screened.refused],
-  };
+  return { items, refused: [...refused, ...screened.refused] };
+}
+
+async function confirmIdentity({ items, refused }, identify) {
+  const found = await Promise.all(items.map((item) => identify(item.path)));
+  const kept = [];
+  const changed = [];
+  items.forEach((item, i) => {
+    const on = found[i];
+    if (on?.isDir && on.recNo === item.recNo) kept.push(item);
+    else changed.push({ path: item.path, reason: "changed since the map was read" });
+  });
+  return offered(kept, [...refused, ...changed]);
+}
+
+function offered(items, refused) {
+  let total = 0;
+  for (const item of items) total += Number(item.bytes);
+  return { paths: items.map((i) => i.path), items, bytes: String(total), refused };
 }

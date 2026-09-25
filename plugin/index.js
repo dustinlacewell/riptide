@@ -24,6 +24,7 @@ import { driveOf } from "./caches/expand.js";
 import { createMapStore } from "./map/store.js";
 import { readMap } from "./map/read.js";
 import { childrenPage } from "./map/page.js";
+import { identifyFolder } from "./map/identify.js";
 import { offerPicks } from "./map/offer.js";
 
 const BASE = "/__riptide";
@@ -520,7 +521,7 @@ async function mapOfferRoute(req, res) {
   }
   if (!slot) return json(res, 404, { error: "no map for that drive" });
 
-  const result = offerPicks(slot.snap, recNos);
+  const result = await offerPicks(slot.snap, recNos, { identify: identifyFolder });
   // A new pick replaces the last one's offer.
   offered.clear("map");
   offered.add(result.paths, "map");

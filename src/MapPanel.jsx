@@ -60,6 +60,14 @@ export default function MapPanel({ root, setRoot, chooseRoot, recentRoots, roots
   const extras = useMemo(() => gapTiles(page, map), [page, map]);
 
   const [picks, setPicks] = useState(() => new Map());
+  // Picks are record numbers of one read. A new read — this tab's, or one
+  // the server reports on a 409 — can put other folders under them.
+  const readId = map?.read ?? null;
+  const [picksRead, setPicksRead] = useState(readId);
+  if (picksRead !== readId) {
+    setPicksRead(readId);
+    setPicks(new Map());
+  }
   const selected = useMemo(() => new Set(picks.keys()), [picks]);
   const toggle = useCallback((row) => setPicks((prev) => togglePick(prev, row)), []);
   const [offerRefused, setOfferRefused] = useState([]);
