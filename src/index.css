@@ -110,10 +110,22 @@ button.tab.active {
   margin-top: var(--s-4);
 }
 
-.tab-about {
+.tab-head {
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab-head h2 {
   margin: 0;
+  font-size: var(--fs-stat);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tab-head p {
+  margin: var(--s-1) 0 0;
   color: var(--dim);
-  font-size: var(--fs-body);
+  font-size: var(--fs-title);
 }
 
 /* --- controls ------------------------------------------------------------ */

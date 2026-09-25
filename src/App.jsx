@@ -166,12 +166,10 @@ export default function App() {
       )}
 
       <main className="app">
-        <p className="tab-about">{TABS[tab].about}</p>
-
         {error && <p className="error">{error}</p>}
 
         {TAB_KEYS.map((key) => {
-          const { Panel } = TABS[key];
+          const { Panel, label, about } = TABS[key];
           return (
             <section
               key={key}
@@ -181,6 +179,10 @@ export default function App() {
               className="tab-panel"
               hidden={tab !== key}
             >
+              <header className="tab-head">
+                <h2>{label}</h2>
+                <p>{about}</p>
+              </header>
               <Panel {...shared} onBusy={reportBusy[key]} />
             </section>
           );
