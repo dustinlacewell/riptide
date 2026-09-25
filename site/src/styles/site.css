@@ -1,5 +1,13 @@
 /* Site-wide rules. Colors, type faces, radii, spacing and motion come from
-   the app's tokens (src/ui/tokens.css). Only page-scale sizes live here. */
+   the app's tokens (src/ui/tokens.css). Only page-scale sizes live here.
+
+   The hero embeds the app (.rt-app), which brings its own rules in the
+   riptide layer. The site's rules sit in a layer below it and stop at the
+   app's edge, so neither styles the other. */
+
+@layer site, riptide;
+
+@layer site {
 
 :root {
   --site-width: 1080px;
@@ -9,12 +17,22 @@
   --section-gap: 96px;
 }
 
-* {
-  box-sizing: border-box;
-}
-
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --section-gap: 64px;
+    --fs-lead: 16px;
+    --fs-section: 24px;
+  }
+}
+
+@scope (html) to (.rt-app) {
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -90,10 +108,6 @@ code {
   border-radius: var(--r-md);
 }
 
-@media (max-width: 640px) {
-  :root {
-    --section-gap: 64px;
-    --fs-lead: 16px;
-    --fs-section: 24px;
-  }
-}
+} /* @scope (html) to (.rt-app) */
+
+} /* @layer site */

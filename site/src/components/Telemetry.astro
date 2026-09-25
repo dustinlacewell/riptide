@@ -36,9 +36,9 @@ const RECLAIM_GB = 41.8;
   const RECORDS_MS = 2600;
   const RECLAIM_MS = 1200;
 
-  const root = document.querySelector<HTMLElement>(".telemetry");
+  // The page can hold two: the demo's placeholder and the narrow-screen one.
   const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (root && !calm) play(root);
+  if (!calm) document.querySelectorAll<HTMLElement>(".telemetry").forEach(play);
 
   function play(el: HTMLElement) {
     const records = Number(el.dataset.records);

@@ -1,40 +1,50 @@
 ---
 import WaveMark from "./WaveMark.astro";
 import Telemetry from "./Telemetry.astro";
+import Demo from "./Demo.jsx";
 ---
 
-<header class="wrap hero">
-  <div class="copy">
+<header class="hero">
+  <div class="wrap copy">
     <div class="wordmark">
       <WaveMark size={36} />
       <span>riptide</span>
     </div>
     <h1>Find build junk across a drive. Uncheck what you keep. Delete the rest.</h1>
     <p class="lead">
-      A disk cleaner for Windows developers. It runs on your machine and opens in your browser.
-      Nothing is uploaded.
+      A disk cleaner for Windows developers. Below is the real app on a made-up drive. Press Scan.
     </p>
     {/* TODO: point "Get riptide" at the source repo once its URL is public. */}
     <a class="cta" href="#get">Get riptide</a>
   </div>
-  <Telemetry />
+
+  <!-- The app needs about 900 px. Narrower screens get the figure instead
+       and never load the app. -->
+  <div class="stage wide">
+    <Demo client:visible>
+      <Telemetry />
+    </Demo>
+  </div>
+  <div class="wrap narrow">
+    <Telemetry />
+    <p class="dim">Open on a wider screen to try the demo.</p>
+  </div>
 </header>
 
 <style>
   .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: var(--s-6);
-    align-items: center;
-    padding-top: 72px;
+    padding-top: 64px;
   }
 
   .copy {
     display: flex;
     flex-direction: column;
-    gap: var(--s-5);
+    gap: var(--s-4);
     align-items: flex-start;
-    min-width: 0;
+    width: 100%;
   }
 
   .wordmark {
@@ -53,6 +63,7 @@ import Telemetry from "./Telemetry.astro";
 
   h1 {
     margin: 0;
+    max-width: 24ch;
     font-size: clamp(32px, 5vw, 44px);
     font-weight: 700;
     line-height: 1.12;
@@ -61,7 +72,6 @@ import Telemetry from "./Telemetry.astro";
 
   .lead {
     margin: 0;
-    max-width: 48ch;
     color: var(--dim);
     font-size: var(--fs-lead);
   }
@@ -69,7 +79,7 @@ import Telemetry from "./Telemetry.astro";
   .cta {
     display: inline-flex;
     align-items: center;
-    height: 52px;
+    height: 44px;
     padding: 0 var(--s-5);
     border-radius: var(--r-md);
     background: var(--current);
@@ -84,9 +94,39 @@ import Telemetry from "./Telemetry.astro";
     filter: brightness(1.08);
   }
 
-  @media (max-width: 860px) {
+  /* Wider than the text column: the app is the point of the page. */
+  .stage {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+  }
+
+  .stage :global(.demo-app) {
+    height: clamp(600px, 82vh, 860px);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+  }
+
+  .narrow {
+    display: none;
+  }
+
+  .narrow p {
+    margin: var(--s-3) 0 0;
+  }
+
+  @media (max-width: 899px) {
+    .wide {
+      display: none;
+    }
+
+    .narrow {
+      display: block;
+    }
+
     .hero {
-      grid-template-columns: minmax(0, 1fr);
       gap: var(--s-5);
       padding-top: var(--s-6);
     }

@@ -11,11 +11,14 @@
   box-sizing: border-box;
 }
 
+/* The root resets what a host page's body may pass down. */
 :scope {
+  box-sizing: border-box;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--fs-body);
+  line-height: normal;
 }
 
 button,
