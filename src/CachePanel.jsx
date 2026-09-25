@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSource } from "./source/context.js";
+import { useCaps, useSource } from "./source/context.js";
 import { reclaimOf } from "./reclaim.js";
 import { riskOf } from "./risk.js";
 import { enterDelay } from "./rowEnter.js";
@@ -50,6 +50,7 @@ export default function CachePanel({
   onBusy,
 }) {
   const api = useSource();
+  const caps = useCaps();
   // prefs.disabledCaches is a fresh array each render, so scan would be
   // rebuilt every time if it depended on the array itself. The joined key is
   // stable for the same set of ids.
@@ -257,14 +258,16 @@ export default function CachePanel({
           ))}
         </div>
 
-        <button
-          className="cog"
-          onClick={() => setSettingsOpen(true)}
-          title="Cache configs"
-          aria-label="Cache configs"
-        >
-          <Glyph name="cog" size={20} />
-        </button>
+        {caps.settings && (
+          <button
+            className="cog"
+            onClick={() => setSettingsOpen(true)}
+            title="Cache configs"
+            aria-label="Cache configs"
+          >
+            <Glyph name="cog" size={20} />
+          </button>
+        )}
 
         <button className="primary" onClick={() => scan()} disabled={loading}>
           {loading ? "Looking…" : summary ? "Rescan" : "Find caches"}

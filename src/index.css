@@ -192,6 +192,35 @@ button.cog:hover:not(:disabled) {
   margin-left: auto;
 }
 
+/* Says the app is running on made-up data. */
+.demo-badge {
+  margin-left: auto;
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--current);
+  border-radius: var(--r-pill);
+  color: var(--current);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.demo-badge + .header-cog {
+  margin-left: 0;
+}
+
+/* The demo's pointer at the first thing to press. */
+button.primary.hint-pulse:not(:disabled) {
+  animation: hint-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button.primary.hint-pulse:not(:disabled) {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--current-wash);
+  }
+}
+
 .dialog.app-settings {
   width: min(440px, 100%);
 }
@@ -1907,6 +1936,12 @@ button.row.up .row-name {
 }
 
 } /* @scope (.rt-app) */
+
+@keyframes hint-pulse {
+  50% {
+    box-shadow: 0 0 0 6px var(--current-wash), 0 0 18px 2px var(--current-glow);
+  }
+}
 
 @keyframes tab-pulse {
   50% {

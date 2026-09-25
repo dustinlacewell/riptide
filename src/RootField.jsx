@@ -1,5 +1,6 @@
 import { useState } from "react";
 import DirectoryPicker from "./DirectoryPicker.jsx";
+import { useCaps } from "./source/context.js";
 
 /**
  * The "Search under" control, shared by both tabs.
@@ -16,6 +17,7 @@ export default function RootField({
   recent,
   placeholder,
 }) {
+  const { directoryPicker } = useCaps();
   const [browsing, setBrowsing] = useState(false);
 
   // The current root is always the newest recent, so it would otherwise sit
@@ -35,9 +37,11 @@ export default function RootField({
             placeholder={placeholder}
             spellCheck={false}
           />
-          <button className="browse" onClick={() => setBrowsing(true)}>
-            Browse
-          </button>
+          {directoryPicker && (
+            <button className="browse" onClick={() => setBrowsing(true)}>
+              Browse
+            </button>
+          )}
         </span>
       </label>
 

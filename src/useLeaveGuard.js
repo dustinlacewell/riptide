@@ -1,13 +1,17 @@
 import { useEffect } from "react";
+import { useCaps } from "./source/context.js";
 
 /**
- * Ask before the page closes or reloads, while `active` is true.
+ * Ask before the page closes or reloads, while `active` is true. A source
+ * whose runs cannot hurt anything (the demo) never asks.
  *
  * The browser shows its own wording; the page cannot set it.
  *
- * @param {boolean} active
+ * @param {boolean} wanted
  */
-export function useLeaveGuard(active) {
+export function useLeaveGuard(wanted) {
+  const { leaveGuard } = useCaps();
+  const active = wanted && leaveGuard;
   useEffect(() => {
     if (!active) return undefined;
     const hold = (e) => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { bytes } from "./format.js";
+import { useCaps } from "./source/context.js";
 import Callout from "./ui/Callout.jsx";
 import Dialog from "./ui/Dialog.jsx";
 import ZapButton from "./ZapButton.jsx";
@@ -11,7 +12,7 @@ import ZapButton from "./ZapButton.jsx";
  *
  * Actions are listed apart from the paths, with the commands they run.
  * The Recycle Bin choice is shown only when there are paths: a command has
- * no Recycle Bin.
+ * no Recycle Bin. A source without permanent deletes (the demo) hides it.
  *
  * permanent is owned by the caller: the Zap button outside the dialog
  * shows it too.
@@ -25,6 +26,7 @@ export default function ConfirmDialog({
   onCancel,
   onConfirm,
 }) {
+  const caps = useCaps();
   const [typed, setTyped] = useState("");
 
   const actions = plan.actions ?? [];
@@ -99,7 +101,7 @@ export default function ConfirmDialog({
         </Callout>
       )}
 
-      {pathCount > 0 && (
+      {pathCount > 0 && caps.permanent && (
         <label className="permanent">
           <input
             type="checkbox"

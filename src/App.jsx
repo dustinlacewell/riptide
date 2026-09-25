@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSource, useStorage } from "./source/context.js";
+import { useCaps, useSource, useStorage } from "./source/context.js";
 import ZapPanel from "./ZapPanel.jsx";
 import SearchPanel from "./SearchPanel.jsx";
 import CachePanel from "./CachePanel.jsx";
@@ -61,6 +61,7 @@ const SORT_KEYS = Object.keys(COLUMNS);
  */
 export default function App() {
   const api = useSource();
+  const caps = useCaps();
   const store = useStorage();
   const [prefs, setPrefs] = useState(() => load(store, DEFAULTS, SORT_KEYS));
 
@@ -149,14 +150,18 @@ export default function App() {
           ))}
         </div>
 
-        <button
-          className="cog header-cog"
-          onClick={() => setSettingsOpen(true)}
-          title="Settings"
-          aria-label="Settings"
-        >
-          <Glyph name="cog" size={20} />
-        </button>
+        {caps.demo && <span className="demo-badge">Demo — nothing touches your disk</span>}
+
+        {caps.settings && (
+          <button
+            className="cog header-cog"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Glyph name="cog" size={20} />
+          </button>
+        )}
       </header>
 
       {settingsOpen && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSource } from "./source/context.js";
+import { useCaps, useSource } from "./source/context.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
 import DeleteRun from "./DeleteRun.jsx";
@@ -35,6 +35,8 @@ export default function ZapPanel({
   onBusy,
 }) {
   const api = useSource();
+  // The demo points a first-time visitor at Scan until they press it.
+  const [hint, setHint] = useState(useCaps().demo);
   const [patterns, setPatterns] = useState(prefs.patterns ?? "node_modules");
 
   const [scanning, setScanning] = useState(false);
@@ -143,7 +145,14 @@ export default function ZapPanel({
           />
         </label>
 
-        <button className="primary" onClick={() => runScan()} disabled={scanning || !root}>
+        <button
+          className={hint ? "primary hint-pulse" : "primary"}
+          onClick={() => {
+            setHint(false);
+            runScan();
+          }}
+          disabled={scanning || !root}
+        >
           {scanning ? "Scanning…" : "Scan"}
         </button>
         <FullRescan onClick={() => runScan({ full: true })} disabled={scanning || !root} />
