@@ -639,66 +639,101 @@ button.primary:disabled {
   color: var(--danger);
 }
 
-.outcome {
-  padding: var(--s-3) var(--s-4);
+/* --- delete run ---------------------------------------------------------- */
+
+.delete-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.delete-title {
+  color: var(--dim);
+  font-size: var(--fs-caps);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.delete-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-5);
+}
+
+.delete-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: 20px var(--s-5);
   background: var(--done-wash);
   border-radius: var(--r-md);
 }
 
-.outcome-line {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
+.delete-receipt p {
   margin: 0;
 }
 
-.outcome-line .glyph {
+.delete-receipt-line {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-stat);
+  font-weight: 600;
+}
+
+.delete-receipt-line .glyph {
   color: var(--done);
 }
 
-.failures {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-1);
-  margin: var(--s-2) 0 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--font-mono);
-  font-size: var(--fs-body);
+.delete-receipt-note {
+  color: var(--dim);
 }
 
-.failures li {
+.delete-receipt-failed {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-}
-
-.failures .glyph,
-.failures em {
   color: var(--failed);
 }
 
-.zapping .bar {
-  height: 4px;
-  background: var(--line);
-  border-radius: var(--r-pill);
+/* A deleted row wipes out left to right, then the panel drops it. Each
+   cell clips on its own: table rows do not clip reliably. */
+.hits tr.row-out > td {
+  animation: row-wipe var(--t-base) var(--ease-in) forwards;
+}
+
+@keyframes row-wipe {
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+
+.hits tr.failed {
+  background: var(--failed-wash);
+}
+
+.row-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
   overflow: hidden;
-}
-
-.zapping .fill {
-  height: 100%;
-  background: var(--danger);
-  transition: width var(--t-quick) linear;
-}
-
-.zapping .status {
-  margin: 6px 0 0;
-}
-
-.zapping .current {
-  font-family: var(--font-mono);
+  color: var(--failed);
   font-size: var(--fs-body);
-  color: var(--dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-failed {
+  margin-left: var(--s-2);
+  color: var(--failed);
+  font-size: var(--fs-caps);
 }
 
 .summary {

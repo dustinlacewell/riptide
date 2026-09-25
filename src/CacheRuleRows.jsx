@@ -2,8 +2,11 @@ import { useEffect, useRef } from "react";
 import { bytes } from "./format.js";
 import { riskOf } from "./risk.js";
 import RiskBadge from "./RiskBadge.jsx";
+import { fateClass } from "./deleteTally.js";
+import RowError from "./RowError.jsx";
 import RowPick from "./RowPick.jsx";
 import Glyph from "./ui/Glyph.jsx";
+import { cls } from "./ui/cls.js";
 
 /**
  * One cache rule: a summary row that expands to its instances.
@@ -19,6 +22,7 @@ export default function CacheRuleRows({
   rule,
   enterDelay = 0,
   refused,
+  fateOf = () => null,
   open,
   onToggle,
   spared,
@@ -41,9 +45,17 @@ export default function CacheRuleRows({
   // count "1", and give it no caret to open.
   const lone = rule.count === 1 ? rule.paths[0] : null;
 
+  // A delete run: a lone rule is its one path; a group reports how many of
+  // its instances failed, and each instance row says why.
+  const fate = lone ? fateOf(lone.path) : null;
+  const failed = lone ? 0 : rule.paths.filter((c) => fateOf(c.path)?.error !== undefined).length;
+
   return (
     <>
-      <tr className={ruleClass(risk, none, open)} style={{ animationDelay: `${enterDelay}ms` }}>
+      <tr
+        className={cls(ruleClass(risk, none, open), fateClass(fate))}
+        style={{ animationDelay: `${enterDelay}ms` }}
+      >
         <td className="grip">
           {!lone && (
             <button
@@ -69,7 +81,11 @@ export default function CacheRuleRows({
           )}
         </td>
         <td className="risk-cell">
-          <RiskBadge risk={risk} note={risk === "refused" ? "Never deleted" : rule.riskNote} />
+          {fate?.error !== undefined ? (
+            <RowError error={fate.error} />
+          ) : (
+            <RiskBadge risk={risk} note={risk === "refused" ? "Never deleted" : rule.riskNote} />
+          )}
         </td>
         <td>
           <span className="cache-label">{rule.label}</span>
@@ -87,6 +103,9 @@ export default function CacheRuleRows({
             {!all && !none && (
               <span className="rule-chosen">{chosen.toLocaleString()} selected</span>
             )}
+            {failed > 0 && (
+              <span className="rule-failed">{failed.toLocaleString()} failed</span>
+            )}
           </td>
         )}
         <td className="num">{bytes(rule.bytes)}</td>
@@ -101,6 +120,7 @@ export default function CacheRuleRows({
             cache={cache}
             risk={riskOf(cache, refused)}
             spared={spared.has(cache.path)}
+            fate={fateOf(cache.path)}
             setChecked={setChecked}
             onPointerDown={onPointerDown}
             onPointerEnter={onPointerEnter}
@@ -110,7 +130,7 @@ export default function CacheRuleRows({
   );
 }
 
-function MemberRow({ cache, risk, spared, setChecked, onPointerDown, onPointerEnter }) {
+function MemberRow({ cache, risk, spared, fate, setChecked, onPointerDown, onPointerEnter }) {
   const refused = risk === "refused";
   const paint = refused
     ? {}
@@ -120,7 +140,7 @@ function MemberRow({ cache, risk, spared, setChecked, onPointerDown, onPointerEn
       };
 
   return (
-    <tr className={memberClass(risk, spared)} {...paint}>
+    <tr className={cls(memberClass(risk, spared), fateClass(fate))} {...paint}>
       <td className="grip" />
       <td>
         <RowPick
@@ -132,6 +152,7 @@ function MemberRow({ cache, risk, spared, setChecked, onPointerDown, onPointerEn
       </td>
       <td className="risk-cell">
         {refused && <span className="never">Never deleted</span>}
+        {fate?.error !== undefined && <RowError error={fate.error} />}
       </td>
       <td className="path" colSpan={2} title={cache.path}>
         {cache.path}

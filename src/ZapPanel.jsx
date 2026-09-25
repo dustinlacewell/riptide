@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "./api.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 import HitRow from "./HitRow.jsx";
-import ZapStatus from "./ZapStatus.jsx";
+import DeleteRun from "./DeleteRun.jsx";
 import ReclaimPanel from "./ReclaimPanel.jsx";
+import { fateOf } from "./deleteTally.js";
+import { pathKey } from "./pathKey.js";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
 import { reclaimOf } from "./reclaim.js";
@@ -43,9 +45,9 @@ export default function ZapPanel({
   // Drop only what actually went. A failed path stays on the list so it can
   // be retried or investigated.
   const onDeleted = useCallback((deleted) => {
-    const gone = new Set(deleted);
+    const gone = new Set(deleted.map(pathKey));
     setResult((prev) =>
-      prev ? { ...prev, hits: prev.hits.filter((h) => !gone.has(h.path)) } : prev,
+      prev ? { ...prev, hits: prev.hits.filter((h) => !gone.has(pathKey(h.path))) } : prev,
     );
   }, []);
 
@@ -70,7 +72,7 @@ export default function ZapPanel({
   );
   const reclaim = useMemo(() => reclaimOf(selected, hits), [selected, hits]);
 
-  const busy = scanning || flow.planning || flow.zapping !== null;
+  const busy = scanning || flow.planning || flow.deleting;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
   async function runScan() {
@@ -78,7 +80,7 @@ export default function ZapPanel({
     setScanning(true);
     flow.setError(null);
     setResult(null);
-    flow.setOutcome(null);
+    flow.clearRun();
     setSpared(new Set());
     telemetry.start();
 
@@ -155,7 +157,7 @@ export default function ZapPanel({
 
       {flow.error && <p className="error">{flow.error}</p>}
 
-      <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
+      <DeleteRun run={flow.run} noun={NOUN} />
 
       {result && hits.length > 0 && (
         <div className="results">
@@ -186,6 +188,7 @@ export default function ZapPanel({
                     hit={hit}
                     risk={riskOf(hit, flow.refused)}
                     spared={spared.has(hit.path)}
+                    fate={fateOf(flow.run, hit.path)}
                     enterDelay={enterDelay(i)}
                     setChecked={setChecked}
                     onPointerDown={onPointerDown}
@@ -202,8 +205,8 @@ export default function ZapPanel({
             noun={NOUN}
             permanent={flow.permanent}
             busy={flow.planning}
-            disabled={flow.zapping !== null}
-            onZap={() => flow.preparePlan(selected.map((h) => h.path), reclaim.selected)}
+            disabled={flow.deleting}
+            onZap={() => flow.preparePlan(selected, reclaim.selected)}
           />
         </div>
       )}

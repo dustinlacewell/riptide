@@ -5,8 +5,10 @@ import { riskOf } from "./risk.js";
 import { enterDelay } from "./rowEnter.js";
 import CacheRuleRows from "./CacheRuleRows.jsx";
 import ConfirmDialog from "./ConfirmDialog.jsx";
-import ZapStatus from "./ZapStatus.jsx";
+import DeleteRun from "./DeleteRun.jsx";
 import CacheSettings from "./CacheSettings.jsx";
+import { fateOf } from "./deleteTally.js";
+import { pathKey } from "./pathKey.js";
 import ReclaimPanel from "./ReclaimPanel.jsx";
 import RootField from "./RootField.jsx";
 import ScanTelemetry from "./ScanTelemetry.jsx";
@@ -71,21 +73,21 @@ export default function CachePanel({
   }, []);
 
   const onDeleted = useCallback((deleted) => {
-    const gone = new Set(deleted.map((p) => p.toLowerCase()));
-    setArrived((prev) => prev.filter((c) => !gone.has(c.path.toLowerCase())));
+    const gone = new Set(deleted.map(pathKey));
+    setArrived((prev) => prev.filter((c) => !gone.has(pathKey(c.path))));
   }, []);
 
   const flow = useZapFlow(onDeleted);
   const run = useStoppable();
 
-  const busy = loading || flow.planning || flow.zapping !== null;
+  const busy = loading || flow.planning || flow.deleting;
   useEffect(() => onBusy?.(busy), [busy, onBusy]);
 
   const scan = useCallback(async () => {
     const signal = run.begin();
     setLoading(true);
     flow.setError(null);
-    flow.setOutcome(null);
+    flow.clearRun();
     setSummary(null);
     telemetry.start();
 
@@ -247,7 +249,7 @@ export default function CachePanel({
         </Callout>
       )}
 
-      <ZapStatus zapping={flow.zapping} outcome={flow.outcome} />
+      <DeleteRun run={flow.run} noun={NOUN} />
 
       {found.length > 0 && (
         <div className="results">
@@ -279,6 +281,7 @@ export default function CachePanel({
                     rule={rule}
                     enterDelay={enterDelay(i)}
                     refused={flow.refused}
+                    fateOf={(path) => fateOf(flow.run, path)}
                     open={opened.has(rule.id)}
                     onToggle={toggleOpen}
                     spared={spared}
@@ -297,8 +300,8 @@ export default function CachePanel({
             noun={NOUN}
             permanent={flow.permanent}
             busy={flow.planning}
-            disabled={flow.zapping !== null}
-            onZap={() => flow.preparePlan(selected.map((c) => c.path), reclaim.selected)}
+            disabled={flow.deleting}
+            onZap={() => flow.preparePlan(selected, reclaim.selected)}
           >
             {cautions.length > 0 && (
               <Callout tone="caution" title="Read before deleting">

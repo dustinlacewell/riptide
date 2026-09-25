@@ -1,15 +1,22 @@
 import { bytes, when } from "./format.js";
 import RiskBadge from "./RiskBadge.jsx";
+import { fateClass } from "./deleteTally.js";
+import RowError from "./RowError.jsx";
 import RowPick from "./RowPick.jsx";
+import { cls } from "./ui/cls.js";
 
 /**
  * One found folder in the Zap table. A refused row takes no part in the
  * paint gesture: it cannot be picked, so sweeping over it does nothing.
+ *
+ * fate comes from a delete run: a deleted row wipes out, a failed one
+ * stays and says why.
  */
 export default function HitRow({
   hit,
   risk,
   spared,
+  fate = null,
   enterDelay = 0,
   setChecked,
   onPointerDown,
@@ -25,7 +32,12 @@ export default function HitRow({
 
   return (
     <tr
-      className={rowClass(risk, spared)}
+      className={cls(
+        "row-in",
+        risk !== "safe" && risk,
+        spared && !refused && "spared",
+        fateClass(fate),
+      )}
       style={{ animationDelay: `${enterDelay}ms` }}
       {...paint}
     >
@@ -38,7 +50,11 @@ export default function HitRow({
         />
       </td>
       <td className="risk-cell">
-        <RiskBadge risk={risk} note={refused ? "Never deleted" : hit.riskNote} compact />
+        {fate?.error !== undefined ? (
+          <RowError error={fate.error} />
+        ) : (
+          <RiskBadge risk={risk} note={refused ? "Never deleted" : hit.riskNote} compact />
+        )}
       </td>
       <td className="path" title={hit.path}>
         {hit.path}
@@ -48,10 +64,4 @@ export default function HitRow({
       <td className="num">{when(hit.mtime)}</td>
     </tr>
   );
-}
-
-function rowClass(risk, spared) {
-  return ["row-in", risk === "safe" ? "" : risk, spared && risk !== "refused" ? "spared" : ""]
-    .filter(Boolean)
-    .join(" ");
 }
