@@ -1,0 +1,10 @@
+{
+  "id": "storybook-static",
+  "label": "Storybook output",
+  "tool": "storybook",
+  "dirNames": [
+    "storybook-static"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

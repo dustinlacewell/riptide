@@ -1,0 +1,10 @@
+{
+  "id": "vs-packages",
+  "label": "Visual Studio installer payloads",
+  "tool": "visualstudio",
+  "paths": [
+    "C:\\ProgramData\\Microsoft\\VisualStudio\\Packages"
+  ],
+  "cost": "Re-downloaded only when modifying or repairing VS.",
+  "pack": "editors"
+}

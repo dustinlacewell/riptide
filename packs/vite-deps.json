@@ -1,0 +1,11 @@
+{
+  "id": "vite-deps",
+  "label": "Vite deps cache",
+  "tool": "vite",
+  "dirNames": [
+    ".vite"
+  ],
+  "under": "node_modules",
+  "cost": "Rebuilt on the next dev server start.",
+  "pack": "javascript"
+}

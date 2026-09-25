@@ -1,0 +1,10 @@
+{
+  "id": "turbo-local",
+  "label": "Turborepo local cache",
+  "tool": "turbo",
+  "dirNames": [
+    ".turbo"
+  ],
+  "cost": "Tasks re-run from cold.",
+  "pack": "javascript"
+}

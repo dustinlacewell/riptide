@@ -1,0 +1,10 @@
+{
+  "id": "nuget-packages",
+  "label": "NuGet packages",
+  "tool": "nuget",
+  "paths": [
+    "~/.nuget/packages"
+  ],
+  "cost": "Packages re-downloaded on the next restore.",
+  "pack": "misc"
+}

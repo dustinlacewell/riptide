@@ -1,0 +1,10 @@
+{
+  "id": "conda-pkgs",
+  "label": "conda package cache",
+  "tool": "conda",
+  "paths": [
+    "~/.conda/pkgs"
+  ],
+  "cost": "Re-downloaded on the next env create.",
+  "pack": "python"
+}

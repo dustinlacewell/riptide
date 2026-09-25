@@ -1,0 +1,12 @@
+{
+  "id": "amd-shadercache",
+  "label": "AMD shader cache",
+  "tool": "amd",
+  "paths": [
+    "%LOCALAPPDATA%\\AMD\\DxCache",
+    "%LOCALAPPDATA%\\AMD\\GLCache",
+    "%LOCALAPPDATA%\\AMD\\DxcCache"
+  ],
+  "cost": "Shaders recompile on next launch.",
+  "pack": "system"
+}

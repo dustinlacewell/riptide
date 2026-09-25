@@ -1,0 +1,11 @@
+{
+  "id": "composer-cache",
+  "label": "Composer cache",
+  "tool": "composer",
+  "paths": [
+    "%LOCALAPPDATA%\\Composer",
+    "~/.cache/composer"
+  ],
+  "cost": "Packages re-downloaded on the next install.",
+  "pack": "misc"
+}

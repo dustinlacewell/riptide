@@ -1,0 +1,10 @@
+{
+  "id": "nvidia-ota",
+  "label": "NVIDIA update artifacts",
+  "tool": "nvidia",
+  "paths": [
+    "C:\\ProgramData\\NVIDIA Corporation\\NVIDIA app\\UpdateFramework\\ota-artifacts"
+  ],
+  "cost": "Re-downloaded next time an update runs.",
+  "pack": "system"
+}

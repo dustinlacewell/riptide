@@ -1,0 +1,10 @@
+{
+  "id": "cypress-binaries",
+  "label": "Cypress binaries",
+  "tool": "cypress",
+  "paths": [
+    "%LOCALAPPDATA%\\Cypress\\Cache"
+  ],
+  "cost": "Test runner re-downloaded; hundreds of MB.",
+  "pack": "javascript"
+}

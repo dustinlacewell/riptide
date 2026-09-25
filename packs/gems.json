@@ -1,0 +1,11 @@
+{
+  "id": "gems",
+  "label": "RubyGems cache",
+  "tool": "gem",
+  "paths": [
+    "~/.gem",
+    "~/.bundle/cache"
+  ],
+  "cost": "Gems re-downloaded on the next bundle install.",
+  "pack": "misc"
+}

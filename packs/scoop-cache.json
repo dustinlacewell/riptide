@@ -1,0 +1,10 @@
+{
+  "id": "scoop-cache",
+  "label": "Scoop download cache",
+  "tool": "scoop",
+  "paths": [
+    "~/scoop/cache"
+  ],
+  "cost": "Installers re-downloaded on next install.",
+  "pack": "system"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "deno-cache",
+  "label": "Deno cache",
+  "tool": "deno",
+  "paths": [
+    "%LOCALAPPDATA%\\deno"
+  ],
+  "cost": "Modules re-fetched on the next run.",
+  "pack": "javascript"
+}

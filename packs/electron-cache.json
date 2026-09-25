@@ -1,0 +1,11 @@
+{
+  "id": "electron-cache",
+  "label": "Electron downloads",
+  "tool": "electron",
+  "paths": [
+    "%LOCALAPPDATA%\\electron\\Cache",
+    "~/.cache/electron"
+  ],
+  "cost": "Electron binaries re-downloaded on the next build.",
+  "pack": "javascript"
+}

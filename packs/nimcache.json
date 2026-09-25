@@ -1,0 +1,10 @@
+{
+  "id": "nimcache",
+  "label": "Nim cache",
+  "tool": "nim",
+  "dirNames": [
+    "nimcache"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "misc"
+}

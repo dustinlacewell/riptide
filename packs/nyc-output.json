@@ -1,0 +1,10 @@
+{
+  "id": "nyc-output",
+  "label": "NYC coverage output",
+  "tool": "nyc",
+  "dirNames": [
+    ".nyc_output"
+  ],
+  "cost": "Regenerated on the next test run.",
+  "pack": "javascript"
+}

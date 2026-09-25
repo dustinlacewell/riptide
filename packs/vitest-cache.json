@@ -1,0 +1,11 @@
+{
+  "id": "vitest-cache",
+  "label": "Vitest cache",
+  "tool": "vitest",
+  "dirNames": [
+    ".vitest"
+  ],
+  "under": "node_modules",
+  "cost": "Rebuilt on the next test run.",
+  "pack": "javascript"
+}

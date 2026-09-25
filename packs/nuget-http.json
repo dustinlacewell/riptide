@@ -1,0 +1,11 @@
+{
+  "id": "nuget-http",
+  "label": "NuGet HTTP cache",
+  "tool": "nuget",
+  "paths": [
+    "%LOCALAPPDATA%\\NuGet\\v3-cache",
+    "%LOCALAPPDATA%\\NuGet\\plugins-cache"
+  ],
+  "cost": "Re-downloaded on the next restore.",
+  "pack": "misc"
+}

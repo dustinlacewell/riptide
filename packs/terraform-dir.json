@@ -1,0 +1,10 @@
+{
+  "id": "terraform-dir",
+  "label": "Terraform providers",
+  "tool": "terraform",
+  "dirNames": [
+    ".terraform"
+  ],
+  "cost": "Re-downloaded on the next terraform init.",
+  "pack": "misc"
+}

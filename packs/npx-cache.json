@@ -1,0 +1,10 @@
+{
+  "id": "npx-cache",
+  "label": "npx cache",
+  "tool": "npm",
+  "paths": [
+    "%LOCALAPPDATA%\\npm-cache\\_npx"
+  ],
+  "cost": "Re-downloaded on the next npx run.",
+  "pack": "javascript"
+}

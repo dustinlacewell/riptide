@@ -1,0 +1,10 @@
+{
+  "id": "expo-cache",
+  "label": "Expo cache",
+  "tool": "expo",
+  "dirNames": [
+    ".expo"
+  ],
+  "cost": "Rebuilt on the next start.",
+  "pack": "javascript"
+}

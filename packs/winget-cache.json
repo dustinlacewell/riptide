@@ -1,0 +1,10 @@
+{
+  "id": "winget-cache",
+  "label": "WinGet download cache",
+  "tool": "winget",
+  "paths": [
+    "%LOCALAPPDATA%\\Microsoft\\WinGet"
+  ],
+  "cost": "Installers re-downloaded on next install.",
+  "pack": "system"
+}

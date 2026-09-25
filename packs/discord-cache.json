@@ -1,0 +1,12 @@
+{
+  "id": "discord-cache",
+  "label": "Discord cache",
+  "tool": "discord",
+  "paths": [
+    "%APPDATA%\\discord\\Cache",
+    "%APPDATA%\\discord\\Code Cache",
+    "%APPDATA%\\discord\\GPUCache"
+  ],
+  "cost": "Assets re-download on next launch.",
+  "pack": "apps"
+}

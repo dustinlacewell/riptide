@@ -1,0 +1,10 @@
+{
+  "id": "rollup-cache",
+  "label": "Rollup cache",
+  "tool": "rollup",
+  "dirNames": [
+    ".rollup.cache"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

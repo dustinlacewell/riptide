@@ -1,0 +1,11 @@
+{
+  "id": "nuxt-build",
+  "label": "Nuxt build",
+  "tool": "nuxt",
+  "dirNames": [
+    ".nuxt",
+    ".output"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

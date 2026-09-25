@@ -1,0 +1,10 @@
+{
+  "id": "astro-cache",
+  "label": "Astro build cache",
+  "tool": "astro",
+  "dirNames": [
+    ".astro"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "nvidia-dxcache",
+  "label": "NVIDIA DirectX shader cache",
+  "tool": "nvidia",
+  "paths": [
+    "%LOCALAPPDATA%\\NVIDIA\\DXCache"
+  ],
+  "cost": "Shaders recompile; brief stutter on next launch.",
+  "pack": "system"
+}

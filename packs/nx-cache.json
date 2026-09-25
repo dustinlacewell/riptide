@@ -1,0 +1,11 @@
+{
+  "id": "nx-cache",
+  "label": "Nx cache",
+  "tool": "nx",
+  "paths": [
+    "%LOCALAPPDATA%\\nx\\Cache",
+    "~/.cache/nx"
+  ],
+  "cost": "Tasks re-run from cold.",
+  "pack": "javascript"
+}

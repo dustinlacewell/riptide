@@ -1,0 +1,11 @@
+{
+  "id": "uv-cache",
+  "label": "uv cache",
+  "tool": "uv",
+  "paths": [
+    "%LOCALAPPDATA%\\uv\\cache",
+    "~/.cache/uv"
+  ],
+  "cost": "Re-downloaded on the next install.",
+  "pack": "python"
+}

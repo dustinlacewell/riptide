@@ -1,0 +1,10 @@
+{
+  "id": "next-build",
+  "label": "Next.js build",
+  "tool": "next",
+  "dirNames": [
+    ".next"
+  ],
+  "cost": "Rebuilt on the next build or dev start.",
+  "pack": "javascript"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "playwright-report",
+  "label": "Playwright report",
+  "tool": "playwright",
+  "dirNames": [
+    "playwright-report"
+  ],
+  "cost": "Regenerated on the next test run.",
+  "pack": "javascript"
+}

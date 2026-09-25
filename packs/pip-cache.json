@@ -1,0 +1,11 @@
+{
+  "id": "pip-cache",
+  "label": "pip cache",
+  "tool": "pip",
+  "paths": [
+    "%LOCALAPPDATA%\\pip\\Cache",
+    "~/.cache/pip"
+  ],
+  "cost": "Wheels re-downloaded or rebuilt on the next install.",
+  "pack": "python"
+}

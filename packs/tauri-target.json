@@ -1,0 +1,11 @@
+{
+  "id": "tauri-target",
+  "label": "Tauri target dir",
+  "tool": "tauri",
+  "dirNames": [
+    "target"
+  ],
+  "under": "src-tauri",
+  "cost": "Full rebuild on the next build. These are large.",
+  "pack": "rust"
+}

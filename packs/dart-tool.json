@@ -1,0 +1,10 @@
+{
+  "id": "dart-tool",
+  "label": "Dart tool cache",
+  "tool": "dart",
+  "dirNames": [
+    ".dart_tool"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "misc"
+}

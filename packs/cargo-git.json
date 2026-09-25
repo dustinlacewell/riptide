@@ -1,0 +1,10 @@
+{
+  "id": "cargo-git",
+  "label": "Cargo git checkouts",
+  "tool": "cargo",
+  "paths": [
+    "~/.cargo/git"
+  ],
+  "cost": "Git dependencies re-cloned on the next build.",
+  "pack": "rust"
+}

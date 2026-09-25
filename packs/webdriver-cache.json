@@ -1,0 +1,10 @@
+{
+  "id": "webdriver-cache",
+  "label": "WebDriver binaries",
+  "tool": "webdriver",
+  "paths": [
+    "~/.wdm"
+  ],
+  "cost": "Drivers re-downloaded on next run.",
+  "pack": "misc"
+}

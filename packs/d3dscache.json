@@ -1,0 +1,10 @@
+{
+  "id": "d3dscache",
+  "label": "DirectX shader cache",
+  "tool": "directx",
+  "paths": [
+    "%LOCALAPPDATA%\\D3DSCache"
+  ],
+  "cost": "Shaders recompile; brief stutter once.",
+  "pack": "system"
+}

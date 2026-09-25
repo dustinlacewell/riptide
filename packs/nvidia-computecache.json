@@ -1,0 +1,10 @@
+{
+  "id": "nvidia-computecache",
+  "label": "NVIDIA CUDA cache",
+  "tool": "nvidia",
+  "paths": [
+    "%LOCALAPPDATA%\\NVIDIA\\ComputeCache"
+  ],
+  "cost": "CUDA kernels recompile once.",
+  "pack": "system"
+}

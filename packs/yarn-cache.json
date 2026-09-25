@@ -1,0 +1,12 @@
+{
+  "id": "yarn-cache",
+  "label": "Yarn cache",
+  "tool": "yarn",
+  "paths": [
+    "%LOCALAPPDATA%\\Yarn\\Cache",
+    "~/.yarn/berry/cache",
+    "~/.cache/yarn"
+  ],
+  "cost": "Re-downloaded on the next install.",
+  "pack": "javascript"
+}

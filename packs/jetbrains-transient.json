@@ -1,0 +1,10 @@
+{
+  "id": "jetbrains-transient",
+  "label": "JetBrains transient data",
+  "tool": "jetbrains",
+  "paths": [
+    "%LOCALAPPDATA%\\JetBrains\\Transient"
+  ],
+  "cost": "Regenerated as needed.",
+  "pack": "editors"
+}

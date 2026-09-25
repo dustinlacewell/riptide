@@ -1,0 +1,10 @@
+{
+  "id": "dbg-symbols",
+  "label": "Debug symbol cache",
+  "tool": "windbg",
+  "paths": [
+    "C:\\ProgramData\\Dbg"
+  ],
+  "cost": "Symbols re-downloaded on next debug session.",
+  "pack": "system"
+}

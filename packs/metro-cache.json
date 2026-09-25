@@ -1,0 +1,10 @@
+{
+  "id": "metro-cache",
+  "label": "Metro bundler cache",
+  "tool": "metro",
+  "paths": [
+    "%TEMP%\\metro-cache"
+  ],
+  "cost": "Rebuilt on the next bundle.",
+  "pack": "javascript"
+}

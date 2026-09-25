@@ -1,0 +1,12 @@
+{
+  "id": "zig-cache",
+  "label": "Zig cache",
+  "tool": "zig",
+  "dirNames": [
+    "zig-cache",
+    ".zig-cache",
+    "zig-out"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "misc"
+}

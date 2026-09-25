@@ -1,0 +1,10 @@
+{
+  "id": "nuget-scratch",
+  "label": "NuGet scratch",
+  "tool": "nuget",
+  "paths": [
+    "%TEMP%\\NuGetScratch"
+  ],
+  "cost": "None; transient lock files.",
+  "pack": "misc"
+}

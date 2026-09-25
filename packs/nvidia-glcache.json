@@ -1,0 +1,10 @@
+{
+  "id": "nvidia-glcache",
+  "label": "NVIDIA OpenGL shader cache",
+  "tool": "nvidia",
+  "paths": [
+    "%LOCALAPPDATA%\\NVIDIA\\GLCache"
+  ],
+  "cost": "Shaders recompile on next launch.",
+  "pack": "system"
+}

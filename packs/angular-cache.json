@@ -1,0 +1,10 @@
+{
+  "id": "angular-cache",
+  "label": "Angular cache",
+  "tool": "angular",
+  "dirNames": [
+    ".angular"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

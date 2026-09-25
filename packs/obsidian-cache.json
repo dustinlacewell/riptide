@@ -1,0 +1,12 @@
+{
+  "id": "obsidian-cache",
+  "label": "Obsidian app cache",
+  "tool": "obsidian",
+  "paths": [
+    "%APPDATA%\\obsidian\\Cache",
+    "%APPDATA%\\obsidian\\Code Cache",
+    "%APPDATA%\\obsidian\\GPUCache"
+  ],
+  "cost": "App shell reloads once; vault files untouched.",
+  "pack": "apps"
+}

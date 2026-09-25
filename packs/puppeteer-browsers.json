@@ -1,0 +1,11 @@
+{
+  "id": "puppeteer-browsers",
+  "label": "Puppeteer browsers",
+  "tool": "puppeteer",
+  "paths": [
+    "%LOCALAPPDATA%\\puppeteer",
+    "~/.cache/puppeteer"
+  ],
+  "cost": "Browsers re-downloaded on the next install.",
+  "pack": "javascript"
+}

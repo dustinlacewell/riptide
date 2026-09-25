@@ -1,0 +1,10 @@
+{
+  "id": "gog-webcache",
+  "label": "GOG Galaxy web cache",
+  "tool": "gog",
+  "paths": [
+    "C:\\ProgramData\\GOG.com\\Galaxy\\webcache"
+  ],
+  "cost": "Launcher UI reloads once.",
+  "pack": "apps"
+}

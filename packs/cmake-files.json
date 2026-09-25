@@ -1,0 +1,10 @@
+{
+  "id": "cmake-files",
+  "label": "CMake intermediate",
+  "tool": "cmake",
+  "dirNames": [
+    "CMakeFiles"
+  ],
+  "cost": "Regenerated on the next configure.",
+  "pack": "misc"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "cargo-registry",
+  "label": "Cargo registry",
+  "tool": "cargo",
+  "paths": [
+    "~/.cargo/registry"
+  ],
+  "cost": "Crates re-downloaded on the next build.",
+  "caution": "Holds unpacked crate sources as well as archives. Safe to delete, but a cold rebuild after is slow.",
+  "pack": "rust"
+}

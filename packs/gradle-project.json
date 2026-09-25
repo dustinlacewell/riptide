@@ -1,0 +1,10 @@
+{
+  "id": "gradle-project",
+  "label": "Gradle project cache",
+  "tool": "gradle",
+  "dirNames": [
+    ".gradle"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "jvm"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "go-modcache",
+  "label": "Go module cache",
+  "tool": "go",
+  "paths": [
+    "~/go/pkg/mod"
+  ],
+  "cost": "Modules re-downloaded on the next build.",
+  "caution": "Files are written read-only. Deletion may need to clear that first.",
+  "pack": "misc"
+}

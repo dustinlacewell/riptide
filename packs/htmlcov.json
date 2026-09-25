@@ -1,0 +1,10 @@
+{
+  "id": "htmlcov",
+  "label": "coverage.py HTML report",
+  "tool": "coverage",
+  "dirNames": [
+    "htmlcov"
+  ],
+  "cost": "Regenerated on the next coverage run.",
+  "pack": "python"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "spotify-storage",
+  "label": "Spotify stream cache",
+  "tool": "spotify",
+  "paths": [
+    "%LOCALAPPDATA%\\Spotify\\Storage",
+    "%LOCALAPPDATA%\\Spotify\\Data"
+  ],
+  "cost": "Tracks re-stream on next play.",
+  "pack": "apps"
+}

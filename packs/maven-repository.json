@@ -1,0 +1,11 @@
+{
+  "id": "maven-repository",
+  "label": "Maven repository",
+  "tool": "maven",
+  "paths": [
+    "~/.m2/repository"
+  ],
+  "cost": "Artifacts re-downloaded on the next build.",
+  "caution": "May contain locally installed artifacts that are not in any remote repository.",
+  "pack": "jvm"
+}

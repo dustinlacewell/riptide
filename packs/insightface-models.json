@@ -1,0 +1,10 @@
+{
+  "id": "insightface-models",
+  "label": "InsightFace models",
+  "tool": "insightface",
+  "paths": [
+    "~/.insightface"
+  ],
+  "cost": "Model weights re-downloaded on next use.",
+  "pack": "ml"
+}

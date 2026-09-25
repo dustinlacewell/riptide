@@ -1,0 +1,10 @@
+{
+  "id": "crashdumps",
+  "label": "Crash dumps",
+  "tool": "windows",
+  "paths": [
+    "%LOCALAPPDATA%\\CrashDumps"
+  ],
+  "cost": "Loses local crash dumps kept for debugging.",
+  "pack": "system"
+}

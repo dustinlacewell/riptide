@@ -1,0 +1,10 @@
+{
+  "id": "nvidia-optixcache",
+  "label": "NVIDIA OptiX cache",
+  "tool": "nvidia",
+  "paths": [
+    "%LOCALAPPDATA%\\NVIDIA\\OptixCache"
+  ],
+  "cost": "Kernels recompile on next render.",
+  "pack": "system"
+}

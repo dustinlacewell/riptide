@@ -1,0 +1,11 @@
+{
+  "id": "ccache",
+  "label": "ccache",
+  "tool": "ccache",
+  "paths": [
+    "%LOCALAPPDATA%\\ccache",
+    "~/.ccache"
+  ],
+  "cost": "Compiles run cold once; correctness unaffected.",
+  "pack": "misc"
+}

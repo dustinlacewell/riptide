@@ -1,0 +1,11 @@
+{
+  "id": "torch-hub",
+  "label": "PyTorch Hub checkpoints",
+  "tool": "pytorch",
+  "paths": [
+    "~/.cache/torch"
+  ],
+  "cost": "Model checkpoints re-downloaded; can be gigabytes.",
+  "caution": "Large downloads. Check size before deleting.",
+  "pack": "ml"
+}

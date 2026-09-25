@@ -1,0 +1,10 @@
+{
+  "id": "sccache",
+  "label": "sccache",
+  "tool": "sccache",
+  "paths": [
+    "%LOCALAPPDATA%\\Mozilla\\sccache"
+  ],
+  "cost": "Compiles run cold once.",
+  "pack": "misc"
+}

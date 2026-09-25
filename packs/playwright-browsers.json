@@ -1,0 +1,12 @@
+{
+  "id": "playwright-browsers",
+  "label": "Playwright browsers",
+  "tool": "playwright",
+  "paths": [
+    "%LOCALAPPDATA%\\ms-playwright",
+    "~/.cache/ms-playwright"
+  ],
+  "cost": "Browsers re-downloaded on the next install. These are large.",
+  "caution": "Tests will fail until `playwright install` runs again.",
+  "pack": "javascript"
+}

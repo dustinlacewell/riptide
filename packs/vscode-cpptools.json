@@ -1,0 +1,10 @@
+{
+  "id": "vscode-cpptools",
+  "label": "VS Code C++ IntelliSense",
+  "tool": "vscode",
+  "paths": [
+    "%LOCALAPPDATA%\\Microsoft\\vscode-cpptools"
+  ],
+  "cost": "Extension re-indexes each project on next open.",
+  "pack": "editors"
+}

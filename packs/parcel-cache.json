@@ -1,0 +1,10 @@
+{
+  "id": "parcel-cache",
+  "label": "Parcel cache",
+  "tool": "parcel",
+  "dirNames": [
+    ".parcel-cache"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

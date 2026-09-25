@@ -1,0 +1,11 @@
+{
+  "id": "npm-cache",
+  "label": "npm cache",
+  "tool": "npm",
+  "paths": [
+    "%LOCALAPPDATA%\\npm-cache",
+    "~/.npm/_cacache"
+  ],
+  "cost": "Re-downloaded on the next install.",
+  "pack": "javascript"
+}

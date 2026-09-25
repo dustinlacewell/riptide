@@ -1,0 +1,10 @@
+{
+  "id": "cabal-dist",
+  "label": "Cabal dist-newstyle",
+  "tool": "cabal",
+  "dirNames": [
+    "dist-newstyle"
+  ],
+  "cost": "Full rebuild on the next build.",
+  "pack": "misc"
+}

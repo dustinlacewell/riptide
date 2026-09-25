@@ -1,0 +1,10 @@
+{
+  "id": "intel-shadercache",
+  "label": "Intel shader cache",
+  "tool": "intel",
+  "paths": [
+    "%LOCALAPPDATA%\\Intel\\ShaderCache"
+  ],
+  "cost": "Shaders recompile on next launch.",
+  "pack": "system"
+}

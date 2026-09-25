@@ -1,0 +1,10 @@
+{
+  "id": "python-bytecode",
+  "label": "Python bytecode",
+  "tool": "python",
+  "dirNames": [
+    "__pycache__"
+  ],
+  "cost": "Regenerated on the next import.",
+  "pack": "python"
+}

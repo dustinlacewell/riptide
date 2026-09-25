@@ -1,0 +1,10 @@
+{
+  "id": "jetbrains-installers",
+  "label": "JetBrains Toolbox installers",
+  "tool": "jetbrains",
+  "paths": [
+    "%LOCALAPPDATA%\\JetBrains\\Installations"
+  ],
+  "cost": "Re-downloaded only if reinstalling that build.",
+  "pack": "editors"
+}

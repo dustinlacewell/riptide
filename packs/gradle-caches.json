@@ -1,0 +1,10 @@
+{
+  "id": "gradle-caches",
+  "label": "Gradle caches",
+  "tool": "gradle",
+  "paths": [
+    "~/.gradle/caches"
+  ],
+  "cost": "Dependencies re-downloaded and builds re-run from cold.",
+  "pack": "jvm"
+}

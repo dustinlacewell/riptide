@@ -1,0 +1,10 @@
+{
+  "id": "elixir-build",
+  "label": "Elixir build dir",
+  "tool": "mix",
+  "dirNames": [
+    "_build"
+  ],
+  "cost": "Full rebuild on the next build.",
+  "pack": "misc"
+}

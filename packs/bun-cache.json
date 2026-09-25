@@ -1,0 +1,11 @@
+{
+  "id": "bun-cache",
+  "label": "Bun cache",
+  "tool": "bun",
+  "paths": [
+    "%LOCALAPPDATA%\\bun\\install\\cache",
+    "~/.bun/install/cache"
+  ],
+  "cost": "Re-downloaded on the next install.",
+  "pack": "javascript"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "mypy-cache",
+  "label": "mypy / ruff cache",
+  "tool": "mypy",
+  "dirNames": [
+    ".mypy_cache",
+    ".ruff_cache"
+  ],
+  "cost": "Rebuilt on the next type check or lint.",
+  "pack": "python"
+}

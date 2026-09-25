@@ -1,0 +1,11 @@
+{
+  "id": "poetry-cache",
+  "label": "Poetry cache",
+  "tool": "poetry",
+  "paths": [
+    "%LOCALAPPDATA%\\pypoetry\\Cache",
+    "~/.cache/pypoetry"
+  ],
+  "cost": "Re-downloaded on the next install.",
+  "pack": "python"
+}

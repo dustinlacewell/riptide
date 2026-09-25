@@ -1,0 +1,10 @@
+{
+  "id": "docusaurus-cache",
+  "label": "Docusaurus cache",
+  "tool": "docusaurus",
+  "dirNames": [
+    ".docusaurus"
+  ],
+  "cost": "Rebuilt on the next build.",
+  "pack": "javascript"
+}

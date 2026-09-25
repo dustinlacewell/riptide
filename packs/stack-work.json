@@ -1,0 +1,10 @@
+{
+  "id": "stack-work",
+  "label": "Stack work dir",
+  "tool": "stack",
+  "dirNames": [
+    ".stack-work"
+  ],
+  "cost": "Full rebuild, can be slow.",
+  "pack": "misc"
+}

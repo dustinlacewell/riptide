@@ -1,0 +1,10 @@
+{
+  "id": "typescript-cache",
+  "label": "TypeScript type acquisition",
+  "tool": "typescript",
+  "paths": [
+    "%LOCALAPPDATA%\\Microsoft\\TypeScript"
+  ],
+  "cost": "Type definitions re-acquired automatically.",
+  "pack": "editors"
+}

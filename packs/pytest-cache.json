@@ -1,0 +1,10 @@
+{
+  "id": "pytest-cache",
+  "label": "pytest cache",
+  "tool": "pytest",
+  "dirNames": [
+    ".pytest_cache"
+  ],
+  "cost": "Rebuilt on the next test run.",
+  "pack": "python"
+}

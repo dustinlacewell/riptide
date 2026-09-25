@@ -1,0 +1,10 @@
+{
+  "id": "swift-build",
+  "label": "Swift build dir",
+  "tool": "swift",
+  "dirNames": [
+    ".build"
+  ],
+  "cost": "Full rebuild on the next build.",
+  "pack": "misc"
+}
