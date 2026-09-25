@@ -293,6 +293,20 @@ test("journal: changes from a USN on, across both halves of $J", async () => {
   });
 });
 
+test("journal: findUsnAt lands early, not late, around an unflushed page", async () => {
+  const volume = buildVolume({ records: BASE });
+  const specs = Array.from({ length: 600 }, (_, i) => ({ frn: 1000 + i, time: 1_000_000 + i * 1000 }));
+  const { usns } = installJournal(volume, { changes: specs });
+  const { boot, mftRuns } = await geometry(volume);
+  const info = await readJournalInfo({ read: volume.read, boot, mftRuns, record: 40 });
+
+  volume.buf.fill(0, 105 * CLUSTER, 106 * CLUSTER); // a page past change 250
+  for (const i of [100, 250, 400]) {
+    const usn = await findUsnAt({ read: volume.read, boot, info, time: specs[i].time });
+    assert.ok(usn <= usns[i], `at or before change ${i}`);
+  }
+});
+
 test("journal: an unflushed zero page stops the read at its start", async () => {
   const volume = buildVolume({ records: BASE });
   const specs = Array.from({ length: 600 }, (_, i) => ({ frn: 1000 + i, time: 1_000_000 + i * 1000 }));

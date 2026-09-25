@@ -103,7 +103,9 @@ export async function findUsnAt({ read, boot, info, time }) {
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
     const first = await firstTimeOnPage({ read, boot, info, usn: pages[mid] });
-    if (first !== null && first >= time) hi = mid;
+    // A page with no time (not flushed yet) could hold anything: treat it
+    // as late, so the search lands early rather than past a change.
+    if (first === null || first >= time) hi = mid;
     else lo = mid + 1;
   }
   return pages[Math.max(0, lo - 1)];
